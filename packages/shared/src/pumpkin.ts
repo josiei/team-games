@@ -172,6 +172,7 @@ export type GalleryEntry = { slot: number; strokes: Stroke[]; integrity: Integri
 
 export type PumpkinView =
   | { kind: 'lobby'; playerCount: number }
+  | { kind: 'spectator'; phase: string }
   | {
       kind: 'carving'
       myStrokes: Stroke[]
@@ -212,6 +213,12 @@ export function viewFor(state: PumpkinState, viewer: PlayerId): PumpkinView {
 
   if (state.phase === 'lobby') {
     return { kind: 'lobby', playerCount: totalPlayers }
+  }
+
+  // A late joiner has no pumpkin and no slot. Anything else would let them
+  // vote on a round they did not carve in.
+  if (!state.pumpkins[viewer] && state.phase !== 'results') {
+    return { kind: 'spectator', phase: state.phase }
   }
 
   if (state.phase === 'carving') {
