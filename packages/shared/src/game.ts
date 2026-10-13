@@ -45,18 +45,29 @@ export interface GameModule<State, Action, View> {
  * Display names are player-chosen and a work team will contain two
  * Jocelyns. Labels disambiguate by join order so the gallery and results
  * attribute pumpkins unambiguously.
+ *
+ * Every issued label is unique: a raw name that happens to equal an
+ * already-suffixed form (e.g. a player literally named "Sam (2)") is
+ * pushed past the taken suffixes rather than colliding with them.
  */
 export function labelPlayers(players: Player[]): Record<PlayerId, string> {
   const ordered = [...players].sort((a, b) =>
-    a.joinedAt - b.joinedAt || a.id.localeCompare(b.id))
+    a.joinedAt - b.joinedAt || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
   const seen = new Map<string, number>()
+  const issued = new Set<string>()
   const labels: Record<PlayerId, string> = {}
 
   for (const player of ordered) {
     const key = player.displayName.trim().toLowerCase()
-    const n = (seen.get(key) ?? 0) + 1
+    let n = (seen.get(key) ?? 0) + 1
     seen.set(key, n)
-    labels[player.id] = n === 1 ? player.displayName : `${player.displayName} (${n})`
+    let candidate = n === 1 ? player.displayName : `${player.displayName} (${n})`
+    while (issued.has(candidate)) {
+      n += 1
+      candidate = `${player.displayName} (${n})`
+    }
+    issued.add(candidate)
+    labels[player.id] = candidate
   }
   return labels
 }

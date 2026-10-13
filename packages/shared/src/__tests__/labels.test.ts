@@ -35,4 +35,29 @@ describe('labelPlayers', () => {
     const b = labelPlayers([p('b', 'Sam', 2), p('a', 'Sam', 1)])
     expect(a).toEqual(b)
   })
+
+  it('never issues colliding labels when a raw name equals a suffixed form', () => {
+    const players = [p('a', 'Sam', 1), p('b', 'Sam', 2), p('c', 'Sam (2)', 3)]
+    const labels = labelPlayers(players)
+    expect(labels[asPlayerId('a')]).toBe('Sam')
+    expect(labels[asPlayerId('b')]).toBe('Sam (2)')
+    expect(labels[asPlayerId('c')]).toBe('Sam (2) (2)')
+    expect(new Set(Object.values(labels)).size).toBe(3)
+  })
+
+  it('breaks identical joinedAt ties deterministically by id', () => {
+    const forward = labelPlayers([p('a', 'Sam', 1), p('b', 'Sam', 1)])
+    const reversed = labelPlayers([p('b', 'Sam', 1), p('a', 'Sam', 1)])
+    expect(forward[asPlayerId('a')]).toBe('Sam')
+    expect(forward[asPlayerId('b')]).toBe('Sam (2)')
+    expect(reversed).toEqual(forward)
+  })
+
+  it('returns an empty record for no players', () => {
+    expect(labelPlayers([])).toEqual({})
+  })
+
+  it('returns the unsuffixed name for a single player', () => {
+    expect(labelPlayers([p('a', 'Sam', 1)])).toEqual({ [asPlayerId('a')]: 'Sam' })
+  })
 })
