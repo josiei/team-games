@@ -1,0 +1,54 @@
+import { normalizeCode, type PlayerId } from '@tg/shared'
+
+export type JoinResult = { roomId: string; playerId: PlayerId; playerToken: string }
+
+/** Thrown message when the request never reached the server. */
+export const NETWORK_ERROR = 'NETWORK'
+
+async function post<T>(url: string, body: unknown): Promise<T> {
+  let res: Response
+  try {
+    res = await fetch(url, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+  } catch {
+    throw new Error(NETWORK_ERROR)
+  }
+  if (!res.ok) {
+    const detail = (await res.json().catch(() => ({}))) as { code?: string }
+    throw new Error(detail.code ?? `HTTP ${res.status}`)
+  }
+  return res.json() as Promise<T>
+}
+
+export const createRoom = (gameId: string) =>
+  post<{ code: string; roomId: string }>('/api/rooms', { gameId })
+
+/** Pass an existing `playerToken` to get the SAME player back (idempotent re-join). */
+export const joinRoom = (code: string, displayName: string, playerToken?: string) =>
+  post<JoinResult>(`/api/rooms/${normalizeCode(code)}/join`, {
+    displayName,
+    ...(playerToken ? { playerToken } : {}),
+  })
+
+export const startGame = (code: string, playerToken: string) =>
+  post<{ ok: true }>(`/api/rooms/${normalizeCode(code)}/start`, { playerToken })
+
+export const errorCode = (e: unknown) => (e instanceof Error ? e.message : 'UNKNOWN')
+
+export function humanize(code: string): string {
+  switch (code) {
+    case 'ROOM_NOT_FOUND': return "No room with that code. Check it against the host's screen."
+    case 'ROOM_FULL': return 'That room is full.'
+    case 'NAME_REQUIRED': return 'Pick a name first.'
+    case 'NAME_TOO_LONG': return 'That name is too long.'
+    case 'UNKNOWN_GAME': return 'That game is not available.'
+    case 'NOT_HOST': return 'Only the host can start the game.'
+    case 'NOT_ENOUGH_PLAYERS': return 'Need at least 2 players to start.'
+    case 'ALREADY_STARTED': return 'The game has already started.'
+    case NETWORK_ERROR: return "Can't reach the server. Check your connection and try again."
+    default: return 'Something went wrong. Try again.'
+  }
+}
