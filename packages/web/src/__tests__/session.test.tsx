@@ -68,12 +68,20 @@ describe('session persistence', () => {
     expect(connect).not.toHaveBeenCalled()
   })
 
-  it('keeps the session when the re-join fails only because the network is down', async () => {
+  it.each([
+    ['a network failure', () => Promise.reject(new TypeError('Failed to fetch'))],
+    ['an HTTP 503 with no body code', () => json(503, {})],
+  ])('keeps the session and offers a retry after %s, with no token-less form', async (_n, failure) => {
     localStorage.setItem(SESSION_KEY, JSON.stringify(STORED))
-    fetchMock.mockRejectedValue(new TypeError('Failed to fetch'))
+    fetchMock.mockImplementationOnce(failure)
     render(<App />)
-    expect(await screen.findByLabelText(/room code/i)).toBeTruthy()
+    const retry = await screen.findByRole('button', { name: /try again/i })
+    expect(screen.queryByLabelText(/room code/i)).toBeNull()
     expect(localStorage.getItem(SESSION_KEY)).not.toBeNull()
+    fetchMock.mockReturnValue(json(200, JOIN_OK))
+    fireEvent.click(retry)
+    await waitFor(() => expect(connect).toHaveBeenCalledWith('room-1', asPlayerId('me'), 'tok-1'))
+    expect(JSON.parse(fetchMock.mock.calls[1]![1].body).playerToken).toBe('tok-1')
   })
 
   it('degrades to the join form when storage throws', async () => {
@@ -107,15 +115,39 @@ describe('session persistence', () => {
     })
   })
 
-  it('clears the session when the socket is taken over by another tab', async () => {
+  it('keeps the session when taken over, and can reclaim it with the token', async () => {
+    localStorage.setItem(SESSION_KEY, JSON.stringify(STORED))
+    fetchMock.mockReturnValue(json(200, JOIN_OK))
+    render(<App />)
+    await waitFor(() => expect(connect).toHaveBeenCalledTimes(1))
+    act(() => useConnection.setState({ status: 'taken-over' }))
+    expect(screen.getByText(/another tab/i)).toBeTruthy()
+    expect(localStorage.getItem(SESSION_KEY)).not.toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: /take it back/i }))
+    await waitFor(() => expect(connect).toHaveBeenCalledTimes(2))
+    expect(JSON.parse(fetchMock.mock.calls[1]![1].body).playerToken).toBe('tok-1')
+  })
+
+  it('offers retry and leave immediately when the socket is closed with no view', async () => {
     localStorage.setItem(SESSION_KEY, JSON.stringify(STORED))
     fetchMock.mockReturnValue(json(200, JOIN_OK))
     render(<App />)
     await waitFor(() => expect(connect).toHaveBeenCalled())
-    act(() => useConnection.setState({ status: 'taken-over' }))
-    expect(screen.getByText(/another tab/i)).toBeTruthy()
-    expect(localStorage.getItem(SESSION_KEY)).toBeNull()
+    act(() => useConnection.setState({ status: 'closed' }))
+    expect(screen.getByRole('button', { name: /try again/i })).toBeTruthy()
+    expect(screen.getByRole('button', { name: /leave/i })).toBeTruthy()
   })
+
+  it('offers retry and leave when connecting hangs past the grace period', async () => {
+    localStorage.setItem(SESSION_KEY, JSON.stringify(STORED))
+    fetchMock.mockReturnValue(json(200, JOIN_OK))
+    render(<App />)
+    await waitFor(() => expect(connect).toHaveBeenCalled())
+    act(() => useConnection.setState({ status: 'connecting' }))
+    expect(screen.queryByRole('button', { name: /leave/i })).toBeNull()
+    await new Promise(r => setTimeout(r, 4100))
+    expect(await screen.findByRole('button', { name: /leave/i })).toBeTruthy()
+  }, 10_000)
 
   it('clears the session and returns to the form on an explicit leave', async () => {
     localStorage.setItem(SESSION_KEY, JSON.stringify(STORED))

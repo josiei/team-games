@@ -1,5 +1,7 @@
 import { normalizeCode, type PlayerId } from '@tg/shared'
 
+export const MIN_PLAYERS = 2
+
 export type JoinResult = { roomId: string; playerId: PlayerId; playerToken: string }
 
 /** Thrown message when the request never reached the server. */
@@ -46,7 +48,7 @@ export function humanize(code: string): string {
     case 'NAME_TOO_LONG': return 'That name is too long.'
     case 'UNKNOWN_GAME': return 'That game is not available.'
     case 'NOT_HOST': return 'Only the host can start the game.'
-    case 'NOT_ENOUGH_PLAYERS': return 'Need at least 2 players to start.'
+    case 'NOT_ENOUGH_PLAYERS': return `Need at least ${MIN_PLAYERS} players to start.`
     case 'ALREADY_STARTED': return 'The game has already started.'
     case NETWORK_ERROR: return "Can't reach the server. Check your connection and try again."
     default: return 'Something went wrong. Try again.'

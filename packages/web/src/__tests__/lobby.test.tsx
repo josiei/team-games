@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { fireEvent, render, screen } from '@testing-library/react'
 import { Lobby } from '../lobby/Lobby.js'
 import { JoinScreen } from '../lobby/JoinScreen.js'
@@ -19,6 +19,8 @@ beforeEach(() => {
     hostId: ME, hostLine: null, endsAt: null, clockOffset: 0, me: ME,
   })
 })
+
+afterEach(() => vi.unstubAllGlobals())
 
 describe('JoinScreen', () => {
   it('disables join until both fields are filled', () => {
@@ -48,7 +50,7 @@ describe('JoinScreen', () => {
 describe('Lobby', () => {
   it('shows the room code prominently', () => {
     render(<Lobby code={asRoomCode('AB2CD3')} playerToken="t" />)
-    expect(screen.getByText('AB2CD3')).toBeTruthy()
+    expect(screen.getByText('AB2CD3').classList.contains('room-code')).toBe(true)
   })
 
   it('lists every player by their disambiguated label', () => {
@@ -88,5 +90,28 @@ describe('Lobby', () => {
     useConnection.setState({ status: 'reconnecting' })
     render(<Lobby code={asRoomCode('AB2CD3')} playerToken="t" />)
     expect(screen.getByRole('status').textContent).toMatch(/reconnect/i)
+  })
+
+  it('does not dim the offline marker, only the name', () => {
+    useConnection.setState({
+      players: [player(ME, 'Jocelyn', 1), { ...player(OTHER, 'Sam', 2), connected: false }],
+      labels: { me: 'Jocelyn', other: 'Sam' },
+    })
+    render(<Lobby code={asRoomCode('AB2CD3')} playerToken="t" />)
+    const row = screen.getByText(/offline/i).closest('li') as HTMLElement
+    expect(row.style.opacity).toBe('')
+    expect((screen.getByText(/offline/i) as HTMLElement).style.opacity).toBe('')
+    expect((screen.getByText('Sam') as HTMLElement).style.opacity).toBe('0.5')
+  })
+
+  it('sends only one start request on a double click', () => {
+    const fetchMock = vi.fn(() => new Promise<Response>(() => {}))
+    vi.stubGlobal('fetch', fetchMock)
+    render(<Lobby code={asRoomCode('AB2CD3')} playerToken="t" />)
+    const button = screen.getByRole('button', { name: /start/i })
+    fireEvent.click(button)
+    fireEvent.click(button)
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect((button as HTMLButtonElement).disabled).toBe(true)
   })
 })

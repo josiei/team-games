@@ -2,9 +2,7 @@ import { useState } from 'react'
 import type { RoomCode } from '@tg/shared'
 import { useConnection } from '../store/connection.js'
 import { HostLine } from '../ui/HostLine.js'
-import { errorCode, humanize, startGame } from './api.js'
-
-const MIN_PLAYERS = 2
+import { MIN_PLAYERS, errorCode, humanize, startGame } from './api.js'
 
 export function Lobby({ code, playerToken, onLeave }: {
   code: RoomCode
@@ -17,6 +15,7 @@ export function Lobby({ code, playerToken, onLeave }: {
   const me = useConnection(s => s.me)
   const status = useConnection(s => s.status)
   const [error, setError] = useState<string | null>(null)
+  const [starting, setStarting] = useState(false)
 
   const isHost = me !== null && me === hostId
   const ordered = [...players].sort((a, b) => a.joinedAt - b.joinedAt)
@@ -34,8 +33,10 @@ export function Lobby({ code, playerToken, onLeave }: {
 
       <ul style={{ listStyle: 'none', padding: 0, display: 'grid', gap: 8 }}>
         {ordered.map(player => (
-          <li key={player.id} className="surface" style={{ padding: 12, opacity: player.connected ? 1 : 0.5 }}>
-            <strong>{labels[player.id] ?? player.displayName}</strong>
+          <li key={player.id} className="surface" style={{ padding: 12 }}>
+            <strong style={{ opacity: player.connected ? 1 : 0.5 }}>
+              {labels[player.id] ?? player.displayName}
+            </strong>
             {player.id === hostId && <span> · host</span>}
             {!player.connected && <span> · offline</span>}
           </li>
@@ -47,10 +48,13 @@ export function Lobby({ code, playerToken, onLeave }: {
       {isHost ? (
         <>
           <button
-            disabled={players.length < MIN_PLAYERS}
+            disabled={players.length < MIN_PLAYERS || starting}
             onClick={async () => {
+              if (starting) return
+              setStarting(true); setError(null)
               try { await startGame(code, playerToken) }
               catch (e) { setError(errorCode(e)) }
+              finally { setStarting(false) }
             }}
           >
             Start carving
