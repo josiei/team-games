@@ -5,6 +5,7 @@ import { JoinScreen } from './lobby/JoinScreen.js'
 import { Lobby } from './lobby/Lobby.js'
 import { CarveScreen } from './games/pumpkin/CarveScreen.js'
 import { VoteScreen } from './games/pumpkin/VoteScreen.js'
+import { ResultsScreen } from './games/pumpkin/ResultsScreen.js'
 import { errorCode, humanize, joinRoom } from './lobby/api.js'
 import { clearSession, loadSession, saveSession, type StoredSession } from './lobby/session.js'
 
@@ -125,8 +126,8 @@ export function App() {
   }
   if (view.kind === 'carving') return <CarveScreen roomId={identity.roomId} />
   if (view.kind === 'voting' || view.kind === 'spectator') return <VoteScreen />
-  // The results screen is wired in Task 18.
-  return <p>View: {view.kind}</p>
+  if (view.kind === 'results') return <ResultsScreen />
+  return <p>View: {(view as { kind: string }).kind}</p>
 }
 
 /** Waiting for the first snapshot, with an exit if it never comes. */
