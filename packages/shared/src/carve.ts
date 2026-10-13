@@ -24,6 +24,21 @@ const GY = 80
  */
 export function carvedRatio(strokes: Stroke[]): number {
   if (strokes.length === 0) return 0
+  const hit = ratioCache.get(strokes)
+  if (hit !== undefined) return hit
+  const ratio = computeCarvedRatio(strokes)
+  ratioCache.set(strokes, ratio)
+  return ratio
+}
+
+/**
+ * Submitted stroke arrays are never mutated, so array identity is a sound
+ * cache key. Every vote re-derives the whole gallery for every player; without
+ * this that is O(players^2) rasterizations per vote.
+ */
+const ratioCache = new WeakMap<Stroke[], number>()
+
+function computeCarvedRatio(strokes: Stroke[]): number {
   const grid = new Uint8Array(GX * GY)
 
   for (const stroke of strokes) {

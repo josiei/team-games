@@ -1,3 +1,5 @@
+import { mkdirSync } from 'node:fs'
+import path from 'node:path'
 import Database from 'better-sqlite3'
 import { drizzle } from 'drizzle-orm/better-sqlite3'
 import * as schema from './schema.js'
@@ -43,6 +45,10 @@ CREATE INDEX IF NOT EXISTS snapshot_ws_idx ON room_snapshot(workspace_id);
 `
 
 export function createDb(url: string) {
+  // A file-backed db needs its directory to exist (fresh checkout / fresh VM).
+  if (url !== ':memory:' && !url.startsWith('file:')) {
+    mkdirSync(path.dirname(path.resolve(url)), { recursive: true })
+  }
   const sqlite = new Database(url)
   sqlite.pragma('journal_mode = WAL')
   sqlite.pragma('foreign_keys = ON')

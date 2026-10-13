@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { AWARD_LABELS, type PumpkinView } from '@tg/shared'
 import { useConnection } from '../../store/connection.js'
 import { Timer } from '../../ui/Timer.js'
@@ -7,6 +8,7 @@ import { PumpkinThumb } from './PumpkinThumb.js'
 export function VoteScreen() {
   const view = useConnection(s => s.view) as PumpkinView | null
   const dispatch = useConnection(s => s.dispatch)
+  const [unsentAward, setUnsentAward] = useState<string | null>(null)
 
   if (view?.kind === 'spectator') {
     return (
@@ -33,6 +35,11 @@ export function VoteScreen() {
 
       <HostLine />
 
+      {/* Always mounted so the live region is announced when its text appears. */}
+      <p role="status" style={{ margin: '8px 0 0', fontWeight: 600, minHeight: '1.2em' }}>
+        {unsentAward === view.award ? 'Vote not sent \u2014 reconnecting. Tap again once you are back.' : ''}
+      </p>
+
       <div style={{
         display: 'grid', gap: 12, marginTop: 16,
         gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))',
@@ -46,7 +53,8 @@ export function VoteScreen() {
               caption={isMine ? 'Yours' : undefined}
               selected={view.myVote === entry.slot}
               disabled={isMine}
-              onClick={() => dispatch({ type: 'VOTE', award: view.award, slot: entry.slot })}
+              onClick={() => setUnsentAward(
+                dispatch({ type: 'VOTE', award: view.award, slot: entry.slot }) ? null : view.award)}
             />
           )
         })}

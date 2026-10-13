@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { InMemoryRoomStore } from '../rooms/store.js'
+import { InMemoryRoomStore, roomConfigFromEnv } from '../rooms/store.js'
 import { asRoomCode, asWorkspaceId, newId } from '@tg/shared'
 
 const WS_A = asWorkspaceId('ws-a')
@@ -178,5 +178,31 @@ describe('joinedAt ordering key', () => {
     const r2 = make(WS_A, 'EF4GH5')
     join(r1, 'A'); join(r1, 'B'); join(r1, 'C')
     expect(join(r2, 'X')).toBe(1_000_000)
+  })
+})
+
+describe('roomConfigFromEnv', () => {
+  it('defaults to 180s carving and 15s votes', () => {
+    const c = roomConfigFromEnv({})
+    expect(c.phaseMs).toEqual({
+      carving: 180_000, 'vote-scariest': 15_000, 'vote-funniest': 15_000,
+      'vote-craft': 15_000, 'vote-cursed': 15_000,
+    })
+  })
+
+  it('honours CARVE_MS and VOTE_MS', () => {
+    const c = roomConfigFromEnv({ CARVE_MS: '60000', VOTE_MS: '20000' })
+    expect(c.phaseMs.carving).toBe(60_000)
+    for (const p of ['vote-scariest', 'vote-funniest', 'vote-craft', 'vote-cursed']) {
+      expect(c.phaseMs[p]).toBe(20_000)
+    }
+  })
+
+  it('ignores junk, zero, negative and over-large values', () => {
+    for (const bad of ['abc', '0', '-5', '1.5', '', '99999999999']) {
+      const c = roomConfigFromEnv({ CARVE_MS: bad, VOTE_MS: bad })
+      expect(c.phaseMs.carving).toBe(180_000)
+      expect(c.phaseMs['vote-craft']).toBe(15_000)
+    }
   })
 })

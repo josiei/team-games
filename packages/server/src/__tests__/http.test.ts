@@ -6,6 +6,7 @@ import { Repo } from '../db/repo.js'
 import { RoomRuntime } from '../rooms/runtime.js'
 import { getGame } from '../games/registry.js'
 import { createDb } from '../db/client.js'
+import { asRoomCode } from '@tg/shared'
 
 let app: FastifyInstance
 let store: InMemoryRoomStore
@@ -57,6 +58,17 @@ describe('POST /api/rooms', () => {
 })
 
 describe('POST /api/rooms/:code/join', () => {
+  it('persists the store\'s monotonic joinedAt, not a second Date.now()', async () => {
+    const { code, roomId } = await createRoom()
+    const live = store.byCode(asRoomCode(code))!
+    for (const name of ['Sam', 'Sam', 'Sam']) await join(code, name)
+    const rows = repo.listPlayersByRoom(roomId as never)
+    expect(rows).toHaveLength(3)
+    const stamps = [...live.players.values()].map(p => p.joinedAt)
+    expect(new Set(stamps).size).toBe(3)            // strictly ordered, even in one ms
+    for (const row of rows) expect(row.joinedAt).toBe(live.players.get(row.id as never)!.joinedAt)
+  })
+
   it('returns credentials for the joining player', async () => {
     const { code, roomId } = await createRoom()
     const res = await join(code, 'Jocelyn')

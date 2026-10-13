@@ -73,6 +73,7 @@ export function registerRoomRoutes(app: FastifyInstance, deps: AppDeps): void {
     // key everything by the store player id.
     repo.addPlayer({
       workspaceId: live.workspaceId, roomId: live.id, displayName, token, id: player.id,
+      joinedAt: player.joinedAt,
     })
     if (live.hostId !== hostBefore) {
       repo.setHost(live.workspaceId, live.id, live.hostId)

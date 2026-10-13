@@ -154,6 +154,41 @@ describe('deadline and draft lifecycle', () => {
   })
 })
 
+describe('dropped DRAFT and lost SUBMIT', () => {
+  it('re-sends a DRAFT the socket dropped, instead of waiting for the next change', () => {
+    vi.useFakeTimers()
+    render(<CarveScreen roomId="r1" />)
+    down(1, 100, 100); up(1)
+    dispatch.mockReturnValue(false)
+    act(() => { vi.advanceTimersByTime(10_000) })
+    expect(sent('DRAFT')).toHaveLength(1)           // attempted, dropped
+    dispatch.mockReturnValue(true)
+    act(() => { vi.advanceTimersByTime(10_000) })
+    expect(sent('DRAFT')).toHaveLength(2)           // still dirty, so retried
+    act(() => { vi.advanceTimersByTime(20_000) })
+    expect(sent('DRAFT')).toHaveLength(2)           // landed; clean again
+  })
+
+  it('un-latches and resends when a snapshot still shows us as not submitted', () => {
+    render(<CarveScreen roomId="r1" />)
+    down(1, 100, 100); move(1, 160, 100); up(1)
+    fireEvent.click(screen.getByText(/Submit pumpkin/))
+    expect(sent('SUBMIT')).toHaveLength(1)          // dispatch said true; the socket then died
+    act(() => { useConnection.setState({ view: { ...carvingView } } as never) }) // server: not submitted
+    expect(sent('SUBMIT')).toHaveLength(2)
+    expect(sent('SUBMIT')[1]!.strokes).toHaveLength(1)
+  })
+
+  it('does not resend once the server shows us as submitted', () => {
+    render(<CarveScreen roomId="r1" />)
+    down(1, 100, 100); up(1)
+    fireEvent.click(screen.getByText(/Submit pumpkin/))
+    act(() => { useConnection.setState({ view: { ...carvingView, submitted: true } } as never) })
+    act(() => { useConnection.setState({ view: { ...carvingView, submitted: true, submittedCount: 2 } } as never) })
+    expect(sent('SUBMIT')).toHaveLength(1)
+  })
+})
+
 describe('submit while the socket is down', () => {
   const draw = () => { down(1, 100, 100); move(1, 160, 100); up(1) }
 

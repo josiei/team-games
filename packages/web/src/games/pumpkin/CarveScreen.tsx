@@ -183,9 +183,10 @@ export function CarveScreen({ roomId }: { roomId: string }) {
     if (submitted) return
     const id = setInterval(() => {
       if (!dirtyRef.current) return
-      dirtyRef.current = false
       persistNow()
-      dispatch({ type: 'DRAFT', strokes: draftRef.current.strokes })
+      // Stay dirty if the socket dropped the frame: that draft is what enters
+      // the gallery for someone who disconnects mid-carve, so retry next tick.
+      if (dispatch({ type: 'DRAFT', strokes: draftRef.current.strokes })) dirtyRef.current = false
     }, DRAFT_AUTOSAVE_MS)
     return () => clearInterval(id)
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -198,6 +199,17 @@ export function CarveScreen({ roomId }: { roomId: string }) {
     const id = setTimeout(() => submitRef.current(), ms)
     return () => clearTimeout(id)
   }, [inCarving, submitted, endsAt, clockOffset])
+
+  // `dispatch` returning true only means the frame reached an open socket, not
+  // the server. If a snapshot still shows this player as NOT submitted after we
+  // latched, the SUBMIT was lost: un-latch and resend. SUBMIT is idempotent
+  // server-side, so a duplicate (e.g. a snapshot already in flight) is harmless.
+  useEffect(() => {
+    if (sentRef.current && inCarving && !submitted) {
+      sentRef.current = false
+      submitRef.current()
+    }
+  }, [view, inCarving, submitted])
 
   // Reconnect: if a submit failed, or the deadline has already passed without
   // one landing, send it now that the socket is open again.

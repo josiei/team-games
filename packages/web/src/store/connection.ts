@@ -14,6 +14,13 @@ type State = {
   endsAt: number | null
   clockOffset: number
   me: PlayerId | null
+  /**
+   * Last server error frame. `phase` is the phase of the snapshot that
+   * accompanied it (null until that snapshot arrives): the server sends the
+   * error first and the terminal snapshot right after, so the error must
+   * survive that one snapshot and clear only when the phase moves on.
+   */
+  error: { code: string; message: string; phase: string | null } | null
 }
 
 type Actions = {
@@ -54,6 +61,7 @@ export const useConnection = create<State & Actions>((set, get) => ({
   endsAt: null,
   clockOffset: 0,
   me: null,
+  error: null,
 
   connect(roomId, playerId, token) {
     lastArgs = { roomId, playerId, token }
@@ -122,7 +130,10 @@ export const useConnection = create<State & Actions>((set, get) => ({
       case 'snapshot':
         // The deadline is part of the authoritative snapshot: it is replaced
         // wholesale each time, so a mid-phase snapshot can never blank it.
-        return set({
+        return set(state => ({
+          error: !state.error ? null
+            : state.error.phase === null ? { ...state.error, phase: message.phase }
+            : state.error.phase === message.phase ? state.error : null,
           phase: message.phase,
           view: message.view,
           players: message.players,
@@ -130,9 +141,11 @@ export const useConnection = create<State & Actions>((set, get) => ({
           hostId: message.hostId,
           endsAt: message.endsAt,
           clockOffset: Date.now() - message.serverNow,
-        })
+        }))
       case 'host':
         return set({ hostLine: message.line })
+      case 'error':
+        return set({ error: { code: message.code, message: message.message, phase: null } })
       default:
         return
     }

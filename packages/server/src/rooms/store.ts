@@ -9,15 +9,37 @@ export type RoomPlayer = Player & { token: string; spectator: boolean }
 
 export type RoomConfig = { phaseMs: Record<string, number> }
 
-export const DEFAULT_ROOM_CONFIG: RoomConfig = {
-  phaseMs: {
-    carving: 180_000,
-    'vote-scariest': 15_000,
-    'vote-funniest': 15_000,
-    'vote-craft': 15_000,
-    'vote-cursed': 15_000,
-  },
+const FALLBACK_CARVE_MS = 180_000
+const FALLBACK_VOTE_MS = 15_000
+/** setTimeout cannot take more than a signed 32-bit int. */
+const MAX_TIMER_MS = 2 ** 31 - 1
+
+function envMs(value: string | undefined, fallback: number): number {
+  if (value === undefined || value.trim() === '') return fallback
+  const n = Number(value)
+  return Number.isInteger(n) && n > 0 && n <= MAX_TIMER_MS ? n : fallback
 }
+
+/**
+ * Phase timings, tunable per deploy without a code change: CARVE_MS for the
+ * carving phase and VOTE_MS for each of the four vote phases. Unset or invalid
+ * values fall back to 180_000 / 15_000.
+ */
+export function roomConfigFromEnv(env: Record<string, string | undefined> = process.env): RoomConfig {
+  const carve = envMs(env.CARVE_MS, FALLBACK_CARVE_MS)
+  const vote = envMs(env.VOTE_MS, FALLBACK_VOTE_MS)
+  return {
+    phaseMs: {
+      carving: carve,
+      'vote-scariest': vote,
+      'vote-funniest': vote,
+      'vote-craft': vote,
+      'vote-cursed': vote,
+    },
+  }
+}
+
+export const DEFAULT_ROOM_CONFIG: RoomConfig = roomConfigFromEnv()
 
 /**
  * Live room state. Deliberately holds no sockets: the transport layer keeps

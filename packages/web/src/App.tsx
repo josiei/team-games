@@ -29,6 +29,29 @@ const STUCK_MS = 4000
  * and offers a retry, so we never fall back to a token-less manual join.
  */
 export function App() {
+  return (
+    <>
+      <ErrorBanner />
+      <Router />
+    </>
+  )
+}
+
+/** Server error frames (e.g. PHASE_FAILED) shown above whichever screen is up. */
+export function ErrorBanner() {
+  const error = useConnection(s => s.error)
+  if (!error) return null
+  return (
+    <div role="alert" style={{
+      position: 'sticky', top: 0, zIndex: 10, padding: '12px 16px', textAlign: 'center',
+      fontWeight: 700, background: '#B3261E', color: '#fff',
+    }}>
+      {error.message || `Something went wrong (${error.code}).`}
+    </div>
+  )
+}
+
+function Router() {
   const status = useConnection(s => s.status)
   const view = useConnection(s => s.view) as PumpkinView | null
   const connect = useConnection(s => s.connect)
@@ -72,7 +95,7 @@ export function App() {
     clearSession()
     useConnection.setState({
       status: 'idle', phase: 'lobby', view: null, players: [], labels: {},
-      hostId: null, hostLine: null, endsAt: null, me: null,
+      hostId: null, hostLine: null, endsAt: null, me: null, error: null,
     })
     setIdentity(null); setFailure(null); setPhase('form')
   }

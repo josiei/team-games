@@ -106,6 +106,8 @@ export class Repo {
     workspaceId: WorkspaceId; roomId: RoomId; displayName: string; token: string
     /** Share the id of the live-room player so both stores agree on identity. */
     id?: PlayerId
+    /** The store's monotonic ordering key; persisted so a restart keeps join order. */
+    joinedAt?: number
   }): PlayerRow {
     this.requireRoom(input.workspaceId, input.roomId)
     const row = {
@@ -116,7 +118,7 @@ export class Repo {
       userId: null,
       token: input.token,
       connected: true,
-      joinedAt: Date.now(),
+      joinedAt: input.joinedAt ?? Date.now(),
     }
     this.db.insert(players).values(row).run()
     return row as unknown as PlayerRow

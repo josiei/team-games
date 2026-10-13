@@ -30,15 +30,31 @@ Zustand · Three.js (reveal only)
 pnpm install
 pnpm dev        # server (tsx watch) + web (vite)
 pnpm test       # unit and integration suites
+pnpm exec playwright install chromium   # once per machine, before the first pnpm e2e (see "Installing the browser" below if it hangs)
 pnpm e2e        # Playwright: builds the web client, starts the server, drives two real browsers through a full round
 pnpm playtest 12 [url]   # load script: N headless clients play a round over real HTTP + websockets (url defaults to http://127.0.0.1:3000)
 ```
+
+### Configuration
+
+| Variable | Default | Meaning |
+| --- | --- | --- |
+| `DATABASE_URL` | `./data/team-games.sqlite` | SQLite file (parent directory is created if missing); `:memory:` for throwaway runs |
+| `PORT` | `3000` | HTTP and websocket port |
+| `CARVE_MS` | `180000` | Length of the carving phase, in milliseconds |
+| `VOTE_MS` | `15000` | Length of each of the four vote phases, in milliseconds |
+
+`CARVE_MS` and `VOTE_MS` are read once at server startup (restart to change them;
+a positive integer, otherwise the default is used). They let you tune timings
+after a playtest without a code change, e.g. `VOTE_MS=20000 pnpm -F @tg/server start`.
+`pnpm e2e` derives its waits from the same values, so it stays correct if they
+are set in the shell that runs it.
 
 ### End-to-end tests and the playtest
 
 - `pnpm e2e` takes about 70 seconds (the four vote phases are 15 seconds each).
   It is the only place the carve canvas is actually rasterized; jsdom has no 2D
-  context. Phase timings are read from `DEFAULT_ROOM_CONFIG`, not hardcoded.
+  context. Phase timings are read from `DEFAULT_ROOM_CONFIG` (which honours `CARVE_MS` / `VOTE_MS`), not hardcoded.
 - `pnpm playtest 4` / `pnpm playtest 12` need a running server
   (`pnpm build && pnpm -F @tg/server start`) and print each phase change, then
   `results reached` once every bot has seen results. It exits non-zero otherwise.

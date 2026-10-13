@@ -12,6 +12,17 @@ describe('carvedRatio', () => {
     expect(carvedRatio([])).toBe(0)
   })
 
+  it('memoizes on array identity: a repeat call with the same array does not recompute', () => {
+    const strokes = [cut([[0.5, 0.5]], 0.2)]
+    const first = carvedRatio(strokes)
+    // Mutating in place is outside the contract (submitted arrays are frozen);
+    // it is used here only to prove a recompute would have produced a different value.
+    strokes.push(cut([[0.2, 0.2], [0.8, 0.8]], 0.3))
+    expect(carvedRatio(strokes)).toBe(first)
+    // A different array with the same contents is computed fresh and sees the change.
+    expect(carvedRatio([...strokes])).toBeGreaterThan(first)
+  })
+
   it('grows as more area is cut', () => {
     const small = carvedRatio([cut([[0.5, 0.5]], 0.05)])
     const large = carvedRatio([cut([[0.5, 0.5]], 0.2)])

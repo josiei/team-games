@@ -94,6 +94,18 @@ describe('VoteScreen', () => {
     expect(dispatch).toHaveBeenCalledWith({ type: 'VOTE', award: 'scariest', slot: 2 })
   })
 
+  it('says so when a vote is cast while the socket is closed, and clears once it sends', () => {
+    const dispatch = vi.fn(() => false)
+    useConnection.setState({ dispatch })
+    render(<VoteScreen />)
+    expect(screen.getByRole('status').textContent).toBe('')
+    fireEvent.click(screen.getAllByRole('button', { name: /pumpkin/i })[2]!)
+    expect(screen.getByRole('status').textContent).toMatch(/not sent.*reconnecting/i)
+    dispatch.mockReturnValue(true)
+    fireEvent.click(screen.getAllByRole('button', { name: /pumpkin/i })[2]!)
+    expect(screen.getByRole('status').textContent).toBe('')
+  })
+
   it('marks the current vote as selected', () => {
     setView({ myVote: 2 })
     render(<VoteScreen />)
