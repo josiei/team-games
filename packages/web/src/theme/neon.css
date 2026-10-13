@@ -649,3 +649,203 @@
   text-transform: uppercase;
   color: var(--shell-muted);
 }
+
+/* --- the catwalk --------------------------------------------------------- */
+
+/* Timings are fractions of the 3200ms act in Catwalk.tsx: enter to 24%, turn
+   and settle to 30%, pose to 72%, exit by 100%. Change one and change both. */
+
+.catwalk {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  overflow: hidden;
+  background: radial-gradient(ellipse 70% 50% at 50% 42%,
+    #241537 0%, #120B1E 55%, #07050C 100%);
+  /* The runway recedes: everything inside shares one vanishing point. */
+  perspective: 900px;
+  perspective-origin: 50% 38%;
+}
+
+/* The floor, laid flat into the distance. */
+.catwalk-floor {
+  position: absolute;
+  left: 50%;
+  bottom: -4%;
+  width: 150%;
+  height: 86%;
+  translate: -50% 0;
+  transform: rotateX(72deg);
+  transform-origin: 50% 100%;
+  background:
+    linear-gradient(to top,
+      color-mix(in srgb, var(--accent) 22%, transparent) 0%, transparent 62%),
+    repeating-linear-gradient(to right,
+      #1C1430 0 44px, #171025 44px 88px);
+  box-shadow: 0 0 120px 40px #07050C inset;
+}
+
+/* The spotlight that snaps on when the walker hits her mark. */
+.catwalk-beam {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  width: 54vmin;
+  height: 86%;
+  translate: -50% 0;
+  background: linear-gradient(to bottom,
+    color-mix(in srgb, var(--glow) 34%, transparent),
+    transparent 78%);
+  clip-path: polygon(38% 0, 62% 0, 100% 100%, 0 100%);
+  opacity: 0;
+  animation: beam-up 3200ms ease-out both;
+}
+
+@keyframes beam-up {
+  0%, 26% { opacity: 0; }
+  32%, 70% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+/* --- the walker ---------------------------------------------------------- */
+
+.walker {
+  position: absolute;
+  left: 50%;
+  bottom: 27%;
+  width: min(34vmin, 250px);
+  translate: -50% 0;
+  animation: strut 3200ms cubic-bezier(0.3, 0, 0.2, 1) both;
+}
+
+/* Enters from the wings, holds the mark, leaves on the other side. The pause
+   either side of the pose is what makes it read as a walk and not a slide. */
+@keyframes strut {
+  0%   { transform: translateX(-150%) translateZ(-320px); }
+  24%  { transform: translateX(0) translateZ(0); }
+  72%  { transform: translateX(0) translateZ(0); }
+  100% { transform: translateX(165%) translateZ(-120px); }
+}
+
+/* Turns to face front on arrival, and away again on the way out. */
+.walker-turn { animation: walker-turn 3200ms ease-in-out both; }
+
+@keyframes walker-turn {
+  0%, 18%  { transform: rotateY(-34deg); }
+  30%, 70% { transform: rotateY(0deg); }
+  100%     { transform: rotateY(30deg); }
+}
+
+/* The waddle: squash on the step down, stretch on the lift, with a little
+   roll. Fast enough to read as footsteps at this scale. */
+.walker-body {
+  animation: waddle 460ms ease-in-out infinite;
+  transform-origin: 50% 100%;
+}
+
+.walker-body canvas { display: block; width: 100%; height: auto; }
+
+/* The gallery's own language for a failed pumpkin, kept on the runway. */
+.walker-body.is-sagging { scale: 1 0.96; }
+.walker-body.is-collapsed { rotate: -6deg; scale: 1 0.86; }
+
+@keyframes waddle {
+  0%, 100% { transform: scaleY(1) rotate(-1.6deg); }
+  50%      { transform: scaleY(0.955) rotate(1.6deg); }
+}
+
+/* Grounds the walker: without it she floats over the floor. */
+.walker-shadow {
+  position: absolute;
+  left: 50%;
+  bottom: 7%;
+  width: 56%;
+  height: 16px;
+  translate: -50% 0;
+  border-radius: 50%;
+  background: radial-gradient(ellipse, #000 0%, transparent 72%);
+  opacity: 0.75;
+  animation: shadow-breathe 460ms ease-in-out infinite;
+}
+
+@keyframes shadow-breathe {
+  50% { transform: scaleX(0.9); opacity: 0.6; }
+}
+
+/* --- the plate ----------------------------------------------------------- */
+
+.catwalk-plate {
+  position: absolute;
+  left: 50%;
+  bottom: 6%;
+  width: min(92vw, 520px);
+  translate: -50% 0;
+  text-align: center;
+  animation: plate-slam 3200ms cubic-bezier(0.2, 1.6, 0.4, 1) both;
+}
+
+@keyframes plate-slam {
+  0%, 26%  { opacity: 0; transform: translateY(26px) scale(0.86); }
+  34%, 72% { opacity: 1; transform: translateY(0) scale(1); }
+  100%     { opacity: 0; transform: translateY(10px) scale(0.98); }
+}
+
+.catwalk-award {
+  margin: 0;
+  font-family: var(--font-game);
+  font-size: clamp(1.3rem, 5.5vw, 2.2rem);
+  letter-spacing: 0.04em;
+  color: #FFF4E8;
+  text-shadow: 0 0 10px var(--glow), 0 0 28px var(--accent), 0 0 60px var(--accent);
+}
+
+.catwalk-carver {
+  margin: 6px 0 0;
+  font-family: var(--font-script);
+  font-size: clamp(1.4rem, 6vw, 2.4rem);
+  color: #FFEAF4;
+  text-shadow: 0 0 10px var(--neon-script-ink), 0 0 30px var(--neon-script-ink);
+}
+
+.catwalk-votes {
+  margin: 4px 0 0;
+  font-size: 0.85rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--shell-muted);
+}
+
+/* How many walks are left, so the room knows the show has an end. */
+.catwalk-dots {
+  position: absolute;
+  left: 50%;
+  bottom: 2%;
+  translate: -50% 0;
+  display: flex;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.catwalk-dots li {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--shell-border);
+}
+
+.catwalk-dots li.is-done { background: var(--shell-muted); }
+.catwalk-dots li.is-now { background: var(--accent); box-shadow: 0 0 10px var(--accent); }
+
+/* On a tall screen vmin is driven by the narrow width, so the walker comes out
+   small with a column of empty beam above her. Give her more of the stage and
+   bring the horizon down to meet her. */
+@media (max-aspect-ratio: 3 / 4) {
+  .walker { width: min(52vmin, 280px); bottom: 22%; }
+  .catwalk-floor { height: 62%; }
+  .catwalk-beam { width: 76vmin; }
+}
+
+/* The show never starts under reduced motion (Catwalk.tsx skips straight to the
+   grid), so there is nothing here to switch off. */

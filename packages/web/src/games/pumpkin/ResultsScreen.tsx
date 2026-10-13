@@ -2,9 +2,11 @@ import {
   AWARD_KEYS, AWARD_LABELS,
   type AwardKey, type AwardResult, type GalleryEntry, type PlayerId,
 } from '@tg/shared'
+import { useState } from 'react'
 import { useConnection } from '../../store/connection.js'
 import { HostLine } from '../../ui/HostLine.js'
 import { Spiral } from '../../ui/Spiral.js'
+import { Catwalk, actsFrom, prefersReducedMotion } from './Catwalk.js'
 import { PumpkinThumb } from './PumpkinThumb.js'
 import '../../theme/neon.css'
 
@@ -20,6 +22,9 @@ const UNKNOWN_CARVER = 'Unknown carver'
 export function ResultsScreen() {
   const view = useConnection(s => s.view) as ResultsView
   const labels = useConnection(s => s.labels)
+  // Decided once, on mount: a viewer who arrives at results part-way through
+  // (a reconnect, a late snapshot) must not have the show restart under them.
+  const [showOver, setShowOver] = useState(prefersReducedMotion)
 
   // Always the disambiguated label, never displayName: two players called
   // Jocelyn must be told apart exactly when their work is attributed.
@@ -28,6 +33,12 @@ export function ResultsScreen() {
     const label = carver !== undefined ? labels[carver] : undefined
     // A blank label is as unreadable as a missing one.
     return label && label.trim() !== '' ? label : UNKNOWN_CARVER
+  }
+
+  const acts = actsFrom(view.winners, view.gallery, nameFor)
+
+  if (!showOver && acts.length > 0) {
+    return <Catwalk acts={acts} onDone={() => setShowOver(true)} />
   }
 
   return (
