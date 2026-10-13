@@ -1,7 +1,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { act, render, screen } from '@testing-library/react'
-import type { AwardKey, GalleryEntry } from '@tg/shared'
-import { ACT_MS, Catwalk, actsFrom, prefersReducedMotion } from '../games/pumpkin/Catwalk.js'
+import { AWARD_KEYS, type AwardKey, type GalleryEntry } from '@tg/shared'
+import {
+  ACT_MS, Catwalk, RUNNING_ORDER, actsFrom, markShowSeen, prefersReducedMotion, showSeen,
+} from '../games/pumpkin/Catwalk.js'
 
 const entry = (slot: number): GalleryEntry =>
   ({ slot, strokes: [], integrity: 'solid' }) as GalleryEntry
@@ -16,7 +18,7 @@ const WINNERS = {
 const GALLERY = [entry(0), entry(1), entry(2), entry(3)]
 const nameFor = (slot: number) => `Carver ${slot}`
 
-afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals() })
+afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); sessionStorage.clear() })
 
 /**
  * One act. The next timer is only scheduled once React has committed the new
@@ -51,6 +53,12 @@ describe('actsFrom', () => {
 
   it('returns nothing when no award was decided', () => {
     expect(actsFrom({}, GALLERY, nameFor)).toEqual([])
+  })
+
+  it('walks every award the game can hand out', () => {
+    // RUNNING_ORDER is a hand-kept reordering of AWARD_KEYS. Add a fifth award
+    // and the grid would show it while the show silently dropped it.
+    expect([...RUNNING_ORDER].sort()).toEqual([...AWARD_KEYS].sort())
   })
 
   it('treats a null award the way the server sends one', () => {
@@ -115,11 +123,34 @@ describe('Catwalk', () => {
     vi.useFakeTimers()
     const acts = actsFrom(WINNERS, GALLERY, nameFor)
     const { container } = render(<Catwalk acts={acts} onDone={() => {}} />)
-    const first = container.querySelector('.walker')
+    const grab = () => [
+      container.querySelector('.walker'),
+      container.querySelector('.catwalk-beam'),
+      container.querySelector('.catwalk-plate'),
+    ]
+    const [walker, beam, plate] = grab()
     step()
-    // A reused node would keep its animation mid-flight, so the second walker
-    // would appear already standing on her mark.
-    expect(container.querySelector('.walker')).not.toBe(first)
+    const [walker2, beam2, plate2] = grab()
+    // Reused nodes keep their animations mid-flight. Both of these use `both`
+    // fill and end at opacity 0, so without their own keys walkers two to four
+    // would arrive with the spotlight already dead and no name card at all.
+    expect(walker2).not.toBe(walker)
+    expect(beam2).not.toBe(beam)
+    expect(plate2).not.toBe(plate)
+  })
+
+  it('does not restart the act when a snapshot rebuilds the acts array', () => {
+    vi.useFakeTimers()
+    const onDone = vi.fn()
+    const { rerender } = render(
+      <Catwalk acts={actsFrom(WINNERS, GALLERY, nameFor)} onDone={onDone} />)
+    act(() => { vi.advanceTimersByTime(ACT_MS / 2) })
+    // Every snapshot is a fresh JSON.parse, so `acts` is a new array each time.
+    // Depending on its identity rather than its length would reset the timer on
+    // each one and the show would never advance.
+    rerender(<Catwalk acts={actsFrom(WINNERS, GALLERY, nameFor)} onDone={onDone} />)
+    act(() => { vi.advanceTimersByTime(ACT_MS / 2) })
+    expect(screen.getByText(/Scariest/)).toBeTruthy()
   })
 
   it('marks progress so the room can see the show has an end', () => {
@@ -131,5 +162,22 @@ describe('Catwalk', () => {
     expect(classesAt()).toEqual(['is-now', '', '', ''])
     step(); step()
     expect(classesAt()).toEqual(['is-done', 'is-done', 'is-now', ''])
+  })
+})
+
+describe('showSeen', () => {
+  it('starts false and latches once the show has run', () => {
+    expect(showSeen()).toBe(false)
+    markShowSeen()
+    expect(showSeen()).toBe(true)
+  })
+
+  it('reads as seen where storage throws, rather than replaying the show', () => {
+    vi.stubGlobal('sessionStorage', {
+      getItem() { throw new Error('blocked') },
+      setItem() { throw new Error('blocked') },
+    })
+    expect(showSeen()).toBe(true)
+    expect(() => markShowSeen()).not.toThrow()
   })
 })

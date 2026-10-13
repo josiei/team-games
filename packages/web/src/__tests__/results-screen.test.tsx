@@ -1,6 +1,7 @@
-import { beforeEach, describe, expect, it } from 'vitest'
-import { render, screen, within } from '@testing-library/react'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { act, render, screen, within } from '@testing-library/react'
 import { ResultsScreen } from '../games/pumpkin/ResultsScreen.js'
+import { markShowSeen } from '../games/pumpkin/Catwalk.js'
 import { useConnection } from '../store/connection.js'
 import { asPlayerId } from '@tg/shared'
 
@@ -115,5 +116,52 @@ describe('ResultsScreen', () => {
     useConnection.setState({ labels: { me: '  ', other: 'Jocelyn (2)' } })
     render(<ResultsScreen />)
     expect(card(/scariest/i).getByText(/unknown carver/i)).toBeTruthy()
+  })
+})
+
+describe('ResultsScreen reveal gate', () => {
+  afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); sessionStorage.clear() })
+
+  const allowMotion = () => vi.stubGlobal('matchMedia', () => ({ matches: false }))
+
+  it('runs the catwalk first, then hands the screen to the grid', () => {
+    // Every other test in this file takes the reduced-motion path, because
+    // jsdom has no matchMedia — so without this one the gate itself, and the
+    // handover that ends the show, are never exercised at all.
+    allowMotion()
+    vi.useFakeTimers()
+    setView()
+    render(<ResultsScreen />)
+
+    expect(screen.getByLabelText('Awards reveal')).toBeTruthy()
+    expect(screen.queryByRole('group', { name: /Scariest/ })).toBeNull()
+
+    for (let i = 0; i < 4; i++) act(() => { vi.advanceTimersByTime(3200) })
+
+    expect(screen.queryByLabelText('Awards reveal')).toBeNull()
+    expect(screen.getByRole('group', { name: /Scariest/ })).toBeTruthy()
+  })
+
+  it('does not replay the show for a viewer who has already sat through it', () => {
+    // A refresh or a session takeover remounts this screen. Replaying thirteen
+    // seconds with no skip control would lock them out of their own results.
+    allowMotion()
+    setView()
+    const first = render(<ResultsScreen />)
+    expect(screen.getByLabelText('Awards reveal')).toBeTruthy()
+    act(() => { markShowSeen() })
+    first.unmount()
+
+    render(<ResultsScreen />)
+    expect(screen.queryByLabelText('Awards reveal')).toBeNull()
+    expect(screen.getByRole('group', { name: /Scariest/ })).toBeTruthy()
+  })
+
+  it('skips the show entirely when the system asks for less motion', () => {
+    vi.stubGlobal('matchMedia', () => ({ matches: true }))
+    setView()
+    render(<ResultsScreen />)
+    expect(screen.queryByLabelText('Awards reveal')).toBeNull()
+    expect(screen.getByRole('group', { name: /Scariest/ })).toBeTruthy()
   })
 })

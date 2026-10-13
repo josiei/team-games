@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import {
   AWARD_LABELS, CANVAS_H, CANVAS_W,
   type AwardKey, type GalleryEntry,
@@ -12,10 +12,31 @@ const THEME = { accent: '#FF7518', glow: '#FFC24D', bg: '#0E0D14' }
  * opens because a disaster is a good warm-up, and Funniest closes because the
  * biggest laugh is the one to end on.
  */
-const RUNNING_ORDER: readonly AwardKey[] = ['cursed', 'scariest', 'craft', 'funniest']
+export const RUNNING_ORDER: readonly AwardKey[] = ['cursed', 'scariest', 'craft', 'funniest']
 
-/** One strut: enter, turn, pose under the light, exit. Mirrored in neon.css. */
+/**
+ * One strut: enter, turn, pose under the light, exit. Published to CSS as
+ * `--act-ms` on the stage, so the stylesheet cannot drift out of step with it —
+ * the keyframe percentages are duration-relative and follow automatically.
+ */
 export const ACT_MS = 3200
+
+/**
+ * Whether this browsing session has already sat through the show. Without it,
+ * anything that remounts the results screen — a refresh, taking the session
+ * back from another tab — replays all thirteen seconds before the grid is
+ * reachable again, and there is no skip control. A throw (private mode, blocked
+ * storage) reads as "seen": repeating the show is the worse failure.
+ */
+const SEEN_KEY = 'tg.catwalk.seen'
+
+export function showSeen(): boolean {
+  try { return sessionStorage.getItem(SEEN_KEY) === '1' } catch { return true }
+}
+
+export function markShowSeen(): void {
+  try { sessionStorage.setItem(SEEN_KEY, '1') } catch { /* degrade */ }
+}
 
 export type Act = {
   award: AwardKey
@@ -61,7 +82,11 @@ function Walker({ act }: { act: Act }) {
     const ctx = ref.current?.getContext('2d')
     if (!ctx) return                  // jsdom has no 2D context
     renderPumpkin(ctx, act.entry.strokes, THEME)
-  }, [act.entry])
+    // Keyed on stable values, not the entry object: every snapshot is a fresh
+    // JSON.parse, so a host line or a player dropping mid-act would otherwise
+    // re-rasterize the walker underneath a running 3D composite.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [act.entry.slot, act.entry.strokes.length, act.entry.integrity])
 
   return (
     <div className="walker">
@@ -87,23 +112,49 @@ export function Catwalk({ acts, onDone }: { acts: Act[]; onDone(): void }) {
   doneRef.current = onDone
 
   useEffect(() => {
-    if (index >= acts.length) { doneRef.current(); return }
-    const id = setTimeout(() => setIndex(i => i + 1), ACT_MS)
-    return () => clearTimeout(id)
+    const startedAt = Date.now()
+    // Ending on the timer rather than on a null render keeps the blank frame
+    // between the last walker and the grid off the screen, and the cleanup
+    // guarantees onDone fires once even if the effect is double-invoked.
+    const advance = () => {
+      if (index + 1 >= acts.length) doneRef.current()
+      else setIndex(i => i + 1)
+    }
+    const id = setTimeout(advance, ACT_MS)
+    // A hidden tab has its timers throttled to once a minute after a few
+    // minutes, while the CSS animations keep running on wall clock and settle
+    // on their end frame. Without this, coming back lands on an empty runway.
+    const onVisible = () => {
+      if (!document.hidden && Date.now() - startedAt >= ACT_MS) {
+        clearTimeout(id)
+        advance()
+      }
+    }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => {
+      clearTimeout(id)
+      document.removeEventListener('visibilitychange', onVisible)
+    }
   }, [index, acts.length])
 
   const act = acts[index]
   if (!act) return null
 
   return (
-    <section className="catwalk" aria-label="Awards reveal">
+    <section
+      className="catwalk"
+      aria-label="Awards reveal"
+      style={{ '--act-ms': `${ACT_MS}ms` } as CSSProperties}
+    >
       <div className="catwalk-floor" aria-hidden="true" />
       <div className="catwalk-beam" key={`beam-${index}`} aria-hidden="true" />
 
       {/* Keyed on the act so every animation restarts for each walker. */}
       <Walker key={index} act={act} />
 
-      <div className="catwalk-plate" key={`plate-${index}`}>
+      {/* Announced as each winner lands, so the show is not thirteen silent
+          seconds for anyone listening rather than watching. */}
+      <div className="catwalk-plate" key={`plate-${index}`} aria-live="polite">
         <p className="catwalk-award">{AWARD_LABELS[act.award]}</p>
         <p className="catwalk-carver">{act.carver}</p>
         <p className="catwalk-votes">

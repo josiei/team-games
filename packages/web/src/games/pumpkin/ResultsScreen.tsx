@@ -6,7 +6,7 @@ import { useState } from 'react'
 import { useConnection } from '../../store/connection.js'
 import { HostLine } from '../../ui/HostLine.js'
 import { Spiral } from '../../ui/Spiral.js'
-import { Catwalk, actsFrom, prefersReducedMotion } from './Catwalk.js'
+import { Catwalk, actsFrom, markShowSeen, prefersReducedMotion, showSeen } from './Catwalk.js'
 import { PumpkinThumb } from './PumpkinThumb.js'
 import '../../theme/neon.css'
 
@@ -22,9 +22,11 @@ const UNKNOWN_CARVER = 'Unknown carver'
 export function ResultsScreen() {
   const view = useConnection(s => s.view) as ResultsView
   const labels = useConnection(s => s.labels)
-  // Decided once, on mount: a viewer who arrives at results part-way through
-  // (a reconnect, a late snapshot) must not have the show restart under them.
-  const [showOver, setShowOver] = useState(prefersReducedMotion)
+  // Decided once per mount, but remembered for the browsing session: a refresh
+  // or taking the session back from another tab remounts this screen, and
+  // without the stored flag the full thirteen seconds would replay before the
+  // grid became reachable — with no skip control to escape it.
+  const [showOver, setShowOver] = useState(() => prefersReducedMotion() || showSeen())
 
   // Always the disambiguated label, never displayName: two players called
   // Jocelyn must be told apart exactly when their work is attributed.
@@ -38,7 +40,7 @@ export function ResultsScreen() {
   const acts = actsFrom(view.winners, view.gallery, nameFor)
 
   if (!showOver && acts.length > 0) {
-    return <Catwalk acts={acts} onDone={() => setShowOver(true)} />
+    return <Catwalk acts={acts} onDone={() => { markShowSeen(); setShowOver(true) }} />
   }
 
   return (
