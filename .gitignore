@@ -26,3 +26,6 @@ build/
 coverage/
 playwright-report/
 test-results/
+
+# scratch space (SDD task reports and plans)
+.superpowers/
