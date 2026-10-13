@@ -228,7 +228,10 @@ export class RoomRuntime {
     delete this.room.restoredEndsAt
     if (endsAt === null) { this.phaseEndsAt = null; return }
     const phase = this.room.phase
-    const remaining = endsAt - Date.now()
+    // Clamp to the configured phase length (and Node's timer ceiling): a clock
+    // that moved backwards must not turn into a huge or instantly-firing timeout.
+    const cap = Math.min(this.room.config.phaseMs[phase] ?? 2 ** 31 - 1, 2 ** 31 - 1)
+    const remaining = Math.min(endsAt - Date.now(), cap)
     if (remaining > 0) {
       this.armPhaseTimer(phase, remaining)
       return

@@ -100,6 +100,13 @@ export function registerRoomRoutes(app: FastifyInstance, deps: AppDeps): void {
       return reply.code(409).send({ code: 'NOT_ENOUGH_PLAYERS' })
     }
 
+    // Reject before creating anything: a restored room (state present, runtime
+    // not started) is in progress, and a runtime left in the map unresumed
+    // would have no clock and ignore all input.
+    if (live.state !== null || runtimes.get(live.id)?.hasStarted) {
+      return reply.code(409).send({ code: 'ALREADY_STARTED' })
+    }
+
     let runtime = runtimes.get(live.id)
     if (!runtime) {
       runtime = new RoomRuntime({
@@ -108,8 +115,6 @@ export function registerRoomRoutes(app: FastifyInstance, deps: AppDeps): void {
       })
       runtimes.set(live.id, runtime)
     }
-    // A restored room has state but no started runtime yet; it is in progress.
-    if (runtime.hasStarted || live.state !== null) return reply.code(409).send({ code: 'ALREADY_STARTED' })
     // Genuine failures (disposed room, failed phase entry) surface as 500.
     runtime.start()
     return { ok: true }

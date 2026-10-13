@@ -42,9 +42,13 @@ export function attachSocketServer(
   // Created on demand, including in the lobby, so a host who leaves before
   // starting still goes through runtime.onDisconnect and hands the room over.
   function runtimeFor(roomId: RoomId): RoomRuntime | null {
-    const existing = deps.runtimes.get(roomId)
-    if (existing) return existing
     const room = deps.store.all().find(r => r.id === roomId)
+    const existing = deps.runtimes.get(roomId)
+    if (existing) {
+      // Idempotent: covers a runtime that got into the map without being resumed.
+      if (room && room.state !== null && !existing.hasStarted) existing.resume()
+      return existing
+    }
     if (!room) return null
     const game = getGame(room.gameId)
     if (!game) return null

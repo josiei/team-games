@@ -224,3 +224,29 @@ describe('resume after restore', () => {
     expect(vi.getTimerCount()).toBe(0)
   })
 })
+
+describe('resume clamps the remaining time', () => {
+  it('never arms longer than the configured phase, even if the clock moved back', () => {
+    vi.useFakeTimers()
+    const db = createDb(':memory:')
+    const first = bootRoom(db)
+    first.runtime.start()
+    first.runtime.dispose()
+    first.repo.saveSnapshot({
+      workspaceId: first.workspaceId, roomId: first.room.id, phase: 'carving',
+      state: first.room.state, participants: [...first.room.players.keys()],
+      endsAt: Date.now() + 10 * 24 * 60 * 60 * 1000,   // absurd: ~10 days out
+    })
+    const store = new InMemoryRoomStore()
+    const repo = new Repo(db)
+    restoreRooms(repo, store)
+    const room = store.byCode(asRoomCode('AB2CD3'))!
+    const runtime = new RoomRuntime({ room, store, repo, module: pumpkinModule, send: () => {} })
+    runtime.resume()
+    vi.advanceTimersByTime(179_999)
+    expect(room.phase).toBe('carving')
+    vi.advanceTimersByTime(1)
+    expect(room.phase).toBe('vote-scariest')
+    runtime.dispose()
+  })
+})
