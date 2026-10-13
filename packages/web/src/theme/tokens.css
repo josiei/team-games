@@ -14,6 +14,7 @@
   --accent-2: #8B5CF6;
   --glow: #FFC24D;
   --danger: #84CC16;
+  --ok: #84CC16;         /* 'solid' state; --danger's green reads backwards for it */
 
   --font-display: 'Archivo Variable', system-ui, sans-serif;
   --font-ui: 'Inter Variable', system-ui, sans-serif;

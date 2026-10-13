@@ -1,3 +1,5 @@
+import { COLLAPSE_BASE, COLLAPSE_JITTER } from '@tg/shared'
+
 type Integrity = 'solid' | 'sagging' | 'collapsed'
 
 const LABEL: Record<Integrity, string> = {
@@ -7,10 +9,16 @@ const LABEL: Record<Integrity, string> = {
 }
 
 const COLOR: Record<Integrity, string> = {
-  solid: 'var(--danger)',
+  solid: 'var(--ok)',
   sagging: 'var(--glow)',
   collapsed: 'var(--accent)',
 }
+
+/**
+ * The bar reads full at this ratio: just past the highest possible collapse
+ * point, so the bar never lines up with (and so never reveals) the threshold.
+ */
+const BAR_FULL_RATIO = COLLAPSE_BASE + COLLAPSE_JITTER + 0.01
 
 const CRACKS: Record<Integrity, number> = { solid: 0, sagging: 2, collapsed: 5 }
 
@@ -35,7 +43,7 @@ export function IntegrityMeter({
         }}
       >
         <div style={{
-          width: `${Math.min(100, ratio * 100 / 0.6)}%`,
+          width: `${Math.min(100, ratio * 100 / BAR_FULL_RATIO)}%`,
           height: '100%', background: COLOR[integrity],
           transition: 'width 80ms linear',
         }} />
@@ -47,7 +55,7 @@ export function IntegrityMeter({
           }} />
         ))}
       </div>
-      <p style={{ margin: '4px 0 0', fontSize: 13, color: 'var(--shell-muted)' }}>
+      <p aria-live="polite" style={{ margin: '4px 0 0', fontSize: 13, color: 'var(--shell-muted)' }}>
         {LABEL[integrity]}
       </p>
     </div>
