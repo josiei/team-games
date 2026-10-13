@@ -59,5 +59,7 @@ export const roomSnapshots = sqliteTable('room_snapshot', {
   workspaceId: text('workspace_id').notNull().references(() => workspaces.id),
   phase: text('phase').notNull(),
   state: text('state', { mode: 'json' }).notNull(),
+  // Player ids that were participants (not spectators) when the snapshot was taken.
+  participants: text('participants', { mode: 'json' }),
   updatedAt: integer('updated_at').notNull(),
 }, t => [index('snapshot_ws_idx').on(t.workspaceId)])

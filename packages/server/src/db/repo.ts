@@ -4,7 +4,7 @@ import {
   type PlayerId, type RoomCode, type RoomId, type WorkspaceId,
 } from '@tg/shared'
 import type { Db } from './client.js'
-import { gameResults, players, rooms, workspaces } from './schema.js'
+import { gameResults, players, roomSnapshots, rooms, workspaces } from './schema.js'
 
 const ROOM_TTL_MS = 12 * 60 * 60 * 1000
 export const DEFAULT_WORKSPACE_SLUG = 'default'
@@ -23,6 +23,11 @@ export type PlayerRow = {
 export type GameResultRow = {
   id: string; roomId: RoomId; workspaceId: WorkspaceId
   gameId: string; payload: unknown; createdAt: number
+}
+
+export type SnapshotRow = {
+  roomId: RoomId; workspaceId: WorkspaceId; phase: string
+  state: unknown; participants: PlayerId[] | null; updatedAt: number
 }
 
 export class Repo {
@@ -153,5 +158,45 @@ export class Repo {
     return this.db.select().from(gameResults)
       .where(eq(gameResults.workspaceId, workspaceId))
       .all() as unknown as GameResultRow[]
+  }
+
+  /** One row per room: repeated saves update in place. */
+  saveSnapshot(input: {
+    workspaceId: WorkspaceId; roomId: RoomId; phase: string; state: unknown
+    /** Ids of players who were participants (not spectators). */
+    participants?: PlayerId[]
+  }): void {
+    const now = Date.now()
+    const participants = input.participants ?? null
+    this.db.insert(roomSnapshots).values({
+      roomId: input.roomId,
+      workspaceId: input.workspaceId,
+      phase: input.phase,
+      state: input.state,
+      participants,
+      updatedAt: now,
+    }).onConflictDoUpdate({
+      target: roomSnapshots.roomId,
+      set: { phase: input.phase, state: input.state, participants, updatedAt: now },
+    }).run()
+  }
+
+  // loadSnapshots, listRooms and listPlayersByRoom are the deliberate
+  // exceptions to the workspace-scoping rule: they run only at boot (via
+  // restoreRooms), before any request has a workspace context, and each row
+  // carries its own workspaceId, which is what gets loaded into the store.
+  // They must never be called from a route.
+  loadSnapshots(): SnapshotRow[] {
+    return this.db.select().from(roomSnapshots).all() as unknown as SnapshotRow[]
+  }
+
+  listRooms(): RoomRow[] {
+    return this.db.select().from(rooms)
+      .where(gt(rooms.expiresAt, Date.now())).all() as RoomRow[]
+  }
+
+  listPlayersByRoom(roomId: RoomId): PlayerRow[] {
+    return this.db.select().from(players)
+      .where(eq(players.roomId, roomId)).all() as unknown as PlayerRow[]
   }
 }

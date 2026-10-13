@@ -38,7 +38,7 @@ CREATE INDEX IF NOT EXISTS result_ws_idx ON game_result(workspace_id);
 CREATE TABLE IF NOT EXISTS room_snapshot (
   room_id TEXT PRIMARY KEY REFERENCES room(id),
   workspace_id TEXT NOT NULL REFERENCES workspace(id),
-  phase TEXT NOT NULL, state TEXT NOT NULL, updated_at INTEGER NOT NULL);
+  phase TEXT NOT NULL, state TEXT NOT NULL, participants TEXT, updated_at INTEGER NOT NULL);
 CREATE INDEX IF NOT EXISTS snapshot_ws_idx ON room_snapshot(workspace_id);
 `
 
@@ -47,5 +47,10 @@ export function createDb(url: string) {
   sqlite.pragma('journal_mode = WAL')
   sqlite.pragma('foreign_keys = ON')
   sqlite.exec(DDL)
+  // room_snapshot predates the participants column; add it to older files.
+  const cols = sqlite.pragma('table_info(room_snapshot)') as { name: string }[]
+  if (!cols.some(c => c.name === 'participants')) {
+    sqlite.exec('ALTER TABLE room_snapshot ADD COLUMN participants TEXT')
+  }
   return drizzle(sqlite, { schema })
 }

@@ -6,6 +6,7 @@ import { attachSocketServer } from './transport/socket.js'
 import { InMemoryRoomStore } from './rooms/store.js'
 import { Repo } from './db/repo.js'
 import { createDb } from './db/client.js'
+import { restoreRooms } from './rooms/snapshot.js'
 import type { RoomId } from '@tg/shared'
 import type { RoomRuntime } from './rooms/runtime.js'
 
@@ -14,6 +15,8 @@ const PORT = Number(process.env.PORT ?? 3000)
 
 const repo = new Repo(createDb(DB_URL))
 const store = new InMemoryRoomStore()
+const restored = restoreRooms(repo, store)
+if (restored > 0) console.log(`restored ${restored} room(s) from snapshot`)
 const runtimes = new Map<RoomId, RoomRuntime>()
 
 const deps = { repo, store, runtimes }

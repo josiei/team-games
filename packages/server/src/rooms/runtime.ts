@@ -100,6 +100,11 @@ export class RoomRuntime {
     if (next === undefined || next === null) return
     this.room.state = next
 
+    // Persist before the early returns below, so DRAFT saves too and an
+    // in-progress carving survives a crash. Reached only once the reducer has
+    // produced a new state; every bail-out above returns first.
+    this.persist()
+
     // DRAFT is a private save: nothing fans out, or every player's in-progress
     // strokes would be shipped to everyone.
     if (action.type === 'DRAFT') return
@@ -148,6 +153,7 @@ export class RoomRuntime {
       type: 'error', code: 'PHASE_FAILED',
       message: 'The game hit a problem and had to end.',
     })
+    if (!this.failed) this.persist()   // a terminal room restores as terminal
     this.broadcastSnapshot()
   }
 
@@ -240,8 +246,22 @@ export class RoomRuntime {
     // Side effects live only in onPhaseEnter.
     this.guarded(`onPhaseEnter(${phase})`,
       () => this.module.onPhaseEnter(this.room.state, phase, this.context()))
-    // (saveSnapshot will be called here once persistence lands.)
+    this.persist()
     return true
+  }
+
+  /**
+   * Best-effort durability: a failed write must never break a live game, so
+   * it is logged and swallowed. Called only after state is committed.
+   */
+  private persist(): void {
+    this.guarded('saving snapshot', () => this.repo.saveSnapshot({
+      workspaceId: this.room.workspaceId,
+      roomId: this.room.id,
+      phase: this.room.phase,
+      state: this.room.state,
+      participants: this.store.participants(this.room).map(p => p.id),
+    }))
   }
 
   private guarded(what: string, fn: () => void): void {
