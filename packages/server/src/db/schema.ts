@@ -1,4 +1,4 @@
-import { index, integer, primaryKey, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core'
+import { index, integer, primaryKey, sqliteTable, text } from 'drizzle-orm/sqlite-core'
 
 export const workspaces = sqliteTable('workspace', {
   id: text('id').primaryKey(),
@@ -21,7 +21,7 @@ export const memberships = sqliteTable('membership', {
   workspaceId: text('workspace_id').notNull().references(() => workspaces.id),
   userId: text('user_id').notNull().references(() => users.id),
   role: text('role', { enum: ['admin', 'member'] }).notNull().default('member'),
-}, t => [primaryKey({ columns: [t.workspaceId, t.userId] }), uniqueIndex('membership_unique').on(t.workspaceId, t.userId)])
+}, t => [primaryKey({ columns: [t.workspaceId, t.userId] })])
 
 export const rooms = sqliteTable('room', {
   id: text('id').primaryKey(),

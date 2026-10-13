@@ -16,7 +16,6 @@ CREATE TABLE IF NOT EXISTS membership (
   user_id TEXT NOT NULL REFERENCES user(id),
   role TEXT NOT NULL DEFAULT 'member',
   PRIMARY KEY (workspace_id, user_id));
-CREATE UNIQUE INDEX IF NOT EXISTS membership_unique ON membership(workspace_id, user_id);
 CREATE TABLE IF NOT EXISTS room (
   id TEXT PRIMARY KEY, workspace_id TEXT NOT NULL REFERENCES workspace(id),
   code TEXT NOT NULL,
@@ -40,6 +39,7 @@ CREATE TABLE IF NOT EXISTS room_snapshot (
   room_id TEXT PRIMARY KEY REFERENCES room(id),
   workspace_id TEXT NOT NULL REFERENCES workspace(id),
   phase TEXT NOT NULL, state TEXT NOT NULL, updated_at INTEGER NOT NULL);
+CREATE INDEX IF NOT EXISTS snapshot_ws_idx ON room_snapshot(workspace_id);
 `
 
 export function createDb(url: string) {
