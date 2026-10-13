@@ -42,6 +42,12 @@ export class Repo {
     return this.createWorkspace('Default', DEFAULT_WORKSPACE_SLUG)
   }
 
+  /**
+   * Caller must check isCodeTaken first: room_code_idx is non-unique and
+   * nothing in the schema stops two live rooms sharing a code. (SQLite cannot
+   * express "live" as a partial unique index, since expiresAt > now is not
+   * immutable.)
+   */
   createRoom(input: {
     workspaceId: WorkspaceId; code: RoomCode; gameId: string; expiresAt?: number
   }): RoomRow {
@@ -81,9 +87,20 @@ export class Repo {
       .where(and(eq(rooms.workspaceId, workspaceId), eq(rooms.id, roomId))).run()
   }
 
+  /** Throws unless the room exists inside this workspace. Guards the write path. */
+  private requireRoom(workspaceId: WorkspaceId, roomId: RoomId): void {
+    const room = this.db.select({ id: rooms.id }).from(rooms)
+      .where(and(eq(rooms.workspaceId, workspaceId), eq(rooms.id, roomId)))
+      .get()
+    if (!room) {
+      throw new Error(`room ${roomId} does not exist in workspace ${workspaceId}`)
+    }
+  }
+
   addPlayer(input: {
     workspaceId: WorkspaceId; roomId: RoomId; displayName: string; token: string
   }): PlayerRow {
+    this.requireRoom(input.workspaceId, input.roomId)
     const row = {
       id: newId(),
       roomId: input.roomId,
@@ -119,6 +136,7 @@ export class Repo {
   saveResult(input: {
     workspaceId: WorkspaceId; roomId: RoomId; gameId: string; payload: unknown
   }) {
+    this.requireRoom(input.workspaceId, input.roomId)
     this.db.insert(gameResults).values({
       id: newId(),
       roomId: input.roomId,

@@ -1,4 +1,4 @@
-import { index, integer, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core'
+import { index, integer, primaryKey, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core'
 
 export const workspaces = sqliteTable('workspace', {
   id: text('id').primaryKey(),
@@ -21,7 +21,7 @@ export const memberships = sqliteTable('membership', {
   workspaceId: text('workspace_id').notNull().references(() => workspaces.id),
   userId: text('user_id').notNull().references(() => users.id),
   role: text('role', { enum: ['admin', 'member'] }).notNull().default('member'),
-}, t => [uniqueIndex('membership_unique').on(t.workspaceId, t.userId)])
+}, t => [primaryKey({ columns: [t.workspaceId, t.userId] }), uniqueIndex('membership_unique').on(t.workspaceId, t.userId)])
 
 export const rooms = sqliteTable('room', {
   id: text('id').primaryKey(),
@@ -53,3 +53,11 @@ export const gameResults = sqliteTable('game_result', {
   payload: text('payload', { mode: 'json' }).notNull(),
   createdAt: integer('created_at').notNull(),
 }, t => [index('result_ws_idx').on(t.workspaceId)])
+
+export const roomSnapshots = sqliteTable('room_snapshot', {
+  roomId: text('room_id').primaryKey().references(() => rooms.id),
+  workspaceId: text('workspace_id').notNull().references(() => workspaces.id),
+  phase: text('phase').notNull(),
+  state: text('state', { mode: 'json' }).notNull(),
+  updatedAt: integer('updated_at').notNull(),
+}, t => [index('snapshot_ws_idx').on(t.workspaceId)])
