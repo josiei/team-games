@@ -46,6 +46,13 @@ export function ResultsScreen({ onLeave }: { onLeave?: () => void } = {}) {
   return (
     <main className="game-stage results-stage">
       <Spiral />
+      {/* Without this the room is a dead end: the game is over, every other
+          screen is unreachable, and only clearing storage gets you out. */}
+      {onLeave && (
+        <div className="results-exit">
+          <button className="btn-quiet" onClick={onLeave}>Back to the start</button>
+        </div>
+      )}
       <div className="game-inner">
       <h2 className="game-title">Results</h2>
       <HostLine />
@@ -99,13 +106,6 @@ export function ResultsScreen({ onLeave }: { onLeave?: () => void } = {}) {
         </div>
       </section>
 
-      {/* Without this the room is a dead end: the game is over, every other
-          screen is unreachable, and only clearing storage gets you out. */}
-      {onLeave && (
-        <div className="results-exit">
-          <button className="btn-neon" onClick={onLeave}>Back to the start</button>
-        </div>
-      )}
       </div>
     </main>
   )

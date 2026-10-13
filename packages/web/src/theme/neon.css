@@ -481,11 +481,28 @@
   position: relative;
   z-index: 1;
   width: 100%;
-  max-width: 960px;
+  max-width: 1240px;
   margin: 0 auto;
 }
 
+/* A single centred column, for the screens that are one message. */
 .game-inner.is-narrow { max-width: 560px; }
+
+.game-inner.is-carve { max-width: 1000px; }
+
+/* Side by side once there is room: the canvas is portrait, so on a laptop the
+   width beside it is exactly where the meter and the tools belong — and it
+   lets the pumpkin itself grow. */
+.carve-layout { display: grid; gap: 20px; }
+
+.carve-rail { align-self: start; }
+
+@media (min-width: 880px) {
+  .carve-layout {
+    grid-template-columns: minmax(0, 1fr) 320px;
+    align-items: start;
+  }
+}
 
 .game-head {
   display: flex;
@@ -529,7 +546,14 @@
 
 .carve-frame {
   position: relative;
-  margin-bottom: 12px;
+  /* The canvas is 512x640, and the binding constraint is the viewport's height
+     — the meter and the tools have to stay on screen. So take the height cap
+     as the input and derive the width from the aspect ratio. Sizing the frame
+     by `fit-content` instead makes the canvas's `max-width: 100%` circular, and
+     Chrome resolves it well short of the cap. */
+  --carve-max-h: 58dvh;
+  width: min(100%, calc(var(--carve-max-h) * 512 / 640));
+  margin: 0 auto 12px;
   display: flex;
   justify-content: center;
   border-radius: 16px;
@@ -542,14 +566,16 @@
 
 .carve-frame canvas {
   display: block;
-  margin: 0 auto;
-  /* Bounded by the viewport's height, not just its width. The canvas is 512x640,
-     so at a 560px column it stands 700px tall and pushes the integrity meter and
-     the tools off a laptop screen — and the meter is the whole game. */
-  width: auto;
+  width: 100%;
   height: auto;
-  max-width: 100%;
-  max-height: 58dvh;
+}
+
+/* Must come after the base rule, not up with the rest of the wide-screen
+   layout: both selectors are `.carve-frame`, so source order decides and an
+   earlier override is simply ignored. Once the rail takes the tools out from
+   under the canvas, the pumpkin can have the height back. */
+@media (min-width: 880px) {
+  .carve-frame { --carve-max-h: 74dvh; }
 }
 
 .toolbar {
@@ -605,17 +631,29 @@
 
 /* --- voting and results -------------------------------------------------- */
 
+/* Sized by height, not by the column: a wide stage would otherwise grow these
+   to 400px tall and push the gallery clean off the screen. */
+.thumb-canvas {
+  display: block;
+  margin: 0 auto;
+  width: auto;
+  height: 180px;
+  max-width: 100%;
+}
+
+.award-card .thumb-canvas { height: 200px; }
+
 .gallery-grid {
   display: grid;
   gap: 12px;
   margin-top: 16px;
-  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
 }
 
 .award-grid {
   display: grid;
   gap: 12px;
-  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
 }
 
 .award-card {
@@ -650,13 +688,32 @@
   color: var(--shell-muted);
 }
 
+.results-stage { padding-top: 64px; }
+
 .results-exit {
-  display: flex;
-  justify-content: center;
-  margin-top: 28px;
+  position: fixed;
+  top: 16px;
+  left: 16px;
+  /* Over the stage, under the error banner. */
+  z-index: 6;
 }
 
-.results-exit .btn-neon { min-width: 240px; }
+.results-exit .btn-quiet {
+  padding: 9px 16px;
+  font-family: var(--font-display);
+  font-weight: 700;
+  color: var(--shell-text);
+  background: #1A1826;
+  background: color-mix(in srgb, var(--shell-surface) 92%, transparent);
+  border: 1px solid var(--shell-border);
+  border-radius: 999px;
+}
+
+.results-exit .btn-quiet:hover {
+  border-color: color-mix(in srgb, var(--neon-tube) 60%, transparent);
+}
+
+
 
 /* --- the catwalk --------------------------------------------------------- */
 

@@ -252,12 +252,13 @@ export function CarveScreen({ roomId }: { roomId: string }) {
 
   return (
     <main className="game-stage">
-      <div className="game-inner is-narrow">
+      <div className="game-inner is-carve">
       <header className="game-head">
         <h2 className="game-title">Carve</h2>
         <Timer />
       </header>
 
+      <div className="carve-layout">
       <div className="carve-frame">
       <canvas
         ref={canvasRef}
@@ -308,6 +309,7 @@ export function CarveScreen({ roomId }: { roomId: string }) {
       />
       </div>
 
+      <div className="carve-rail">
       <LiveMeter register={meterRef} />
 
       {/* Always mounted: a live region inserted together with its text is often not announced. */}
@@ -345,6 +347,8 @@ export function CarveScreen({ roomId }: { roomId: string }) {
       <button className="btn-neon" style={{ marginTop: 16, width: '100%' }} onClick={submit}>
         Submit pumpkin ({strokeCount} strokes)
       </button>
+      </div>
+      </div>
 
       <HostLine />
       </div>

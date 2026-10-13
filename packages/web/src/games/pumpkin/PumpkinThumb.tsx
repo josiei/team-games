@@ -60,7 +60,7 @@ export function PumpkinThumb({
 
   const body = (
     <>
-      <canvas ref={ref} width={CANVAS_W} height={CANVAS_H} style={{ width: '100%' }} aria-hidden="true" />
+      <canvas ref={ref} className="thumb-canvas" width={CANVAS_W} height={CANVAS_H} aria-hidden="true" />
       <span style={{ display: 'block', fontSize: 13, color: 'var(--shell-muted)' }}>
         {selected ? '\u2713 ' : ''}{caption}
         {caption && state ? ' \u00b7 ' : ''}{state}
