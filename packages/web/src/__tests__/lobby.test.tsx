@@ -115,3 +115,30 @@ describe('Lobby', () => {
     expect((button as HTMLButtonElement).disabled).toBe(true)
   })
 })
+
+describe('Lobby roster', () => {
+  it('offers an open seat while the room is short of the minimum', () => {
+    useConnection.setState({ players: [player(ME, 'Jocelyn', 1)] })
+    render(<Lobby code={asRoomCode('AB2CD3')} playerToken="t" />)
+    expect(screen.getAllByText('Open seat').length).toBe(1)
+  })
+
+  it('shows no open seats once the minimum is met', () => {
+    render(<Lobby code={asRoomCode('AB2CD3')} playerToken="t" />)
+    expect(screen.queryByText('Open seat')).toBeNull()
+  })
+
+  it('gives every row its own stagger index, so they do not pop in together', () => {
+    const { container } = render(<Lobby code={asRoomCode('AB2CD3')} playerToken="t" />)
+    const indices = [...container.querySelectorAll('.roster-row')]
+      .map(row => (row as HTMLElement).style.getPropertyValue('--i'))
+    expect(indices).toEqual(['0', '1'])
+  })
+
+  it('keeps the pumpkins out of the accessibility tree', () => {
+    const { container } = render(<Lobby code={asRoomCode('AB2CD3')} playerToken="t" />)
+    const pips = container.querySelectorAll('svg.pip')
+    expect(pips.length).toBe(2)
+    for (const pip of pips) expect(pip.getAttribute('aria-hidden')).toBe('true')
+  })
+})

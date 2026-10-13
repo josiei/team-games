@@ -3,6 +3,7 @@ import { render, screen } from '@testing-library/react'
 import { DEFAULT_TAGLINE, TAGLINES, pickTagline } from '../lobby/taglines.js'
 import { NeonSign } from '../ui/NeonSign.js'
 import { Spiral } from '../ui/Spiral.js'
+import { pipColor } from '../ui/PlayerPip.js'
 
 describe('taglines', () => {
   it('leads with the default, which is what a screenshot catches', () => {
@@ -114,5 +115,23 @@ describe('Spiral', () => {
     const paths = container.querySelectorAll('path')
     expect(paths.length).toBe(1)
     expect(paths[0]!.getAttribute('d')!.length).toBeGreaterThan(1000)
+  })
+})
+
+describe('pipColor', () => {
+  it('gives the same player the same pumpkin every time', () => {
+    expect(pipColor('player-one')).toBe(pipColor('player-one'))
+  })
+
+  it('returns a colour from the palette, never undefined', () => {
+    for (const id of ['', 'a', 'player-one', '☃', 'x'.repeat(200)]) {
+      expect(pipColor(id)).toMatch(/^#[0-9A-F]{6}$/)
+    }
+  })
+
+  it('spreads ids across the whole palette rather than clustering', () => {
+    const seen = new Set(
+      Array.from({ length: 400 }, (_, i) => pipColor(`player-${i}`)))
+    expect(seen.size).toBe(8)
   })
 })

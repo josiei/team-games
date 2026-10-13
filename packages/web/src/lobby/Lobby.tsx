@@ -2,7 +2,10 @@ import { useState } from 'react'
 import type { RoomCode } from '@tg/shared'
 import { useConnection } from '../store/connection.js'
 import { HostLine } from '../ui/HostLine.js'
+import { PlayerPip } from '../ui/PlayerPip.js'
+import { Spiral } from '../ui/Spiral.js'
 import { MIN_PLAYERS, errorCode, humanize, startGame } from './api.js'
+import '../theme/neon.css'
 
 export function Lobby({ code, playerToken, onLeave }: {
   code: RoomCode
@@ -19,57 +22,77 @@ export function Lobby({ code, playerToken, onLeave }: {
 
   const isHost = me !== null && me === hostId
   const ordered = [...players].sort((a, b) => a.joinedAt - b.joinedAt)
+  // Below the minimum, show the seats still to fill: an empty row reads as
+  // "someone is missing", where a short list just looks finished.
+  const openSeats = Math.max(0, MIN_PLAYERS - ordered.length)
 
   return (
-    <main style={{ maxWidth: 720, margin: '0 auto', padding: 16 }}>
-      <header>
-        <p style={{ color: 'var(--shell-muted)', margin: 0 }}>Room code</p>
-        <p className="room-code" style={{ margin: 0 }}>{code}</p>
-      </header>
+    <main className="lobby-stage">
+      <Spiral />
+      <div className="lobby-content">
+        <div className="code-sign">
+          <p className="code-sign-label">Room code</p>
+          <p className="room-code">{code}</p>
+          <p className="code-sign-hint">Teammates join with this on the home screen</p>
+        </div>
 
-      {status === 'reconnecting' && (
-        <p role="status" style={{ color: 'var(--glow)' }}>Reconnecting…</p>
-      )}
+        {status === 'reconnecting' && (
+          <p role="status" className="reconnecting">Reconnecting<span className="dots" aria-hidden="true" /></p>
+        )}
 
-      <ul style={{ listStyle: 'none', padding: 0, display: 'grid', gap: 8 }}>
-        {ordered.map(player => (
-          <li key={player.id} className="surface" style={{ padding: 12 }}>
-            <strong style={{ opacity: player.connected ? 1 : 0.5 }}>
-              {labels[player.id] ?? player.displayName}
-            </strong>
-            {player.id === hostId && <span> · host</span>}
-            {!player.connected && <span> · offline</span>}
-          </li>
-        ))}
-      </ul>
+        <ul className="roster">
+          {ordered.map((player, index) => (
+            <li key={player.id} className="roster-row" style={{ '--i': index } as React.CSSProperties}>
+              <PlayerPip id={player.id} connected={player.connected} />
+              <strong className="roster-name" style={{ opacity: player.connected ? 1 : 0.5 }}>
+                {labels[player.id] ?? player.displayName}
+              </strong>
+              {player.id === hostId && <span className="roster-tag">host</span>}
+              {!player.connected && <span className="roster-tag is-quiet">offline</span>}
+            </li>
+          ))}
+          {Array.from({ length: openSeats }, (_, n) => (
+            <li key={`seat-${n}`} className="roster-row is-empty"
+              style={{ '--i': ordered.length + n } as React.CSSProperties}>
+              <span className="pip-empty" aria-hidden="true" />
+              <span className="roster-name is-quiet">Open seat</span>
+            </li>
+          ))}
+        </ul>
 
-      <HostLine />
+        <HostLine />
 
-      {isHost ? (
-        <>
-          <button
-            disabled={players.length < MIN_PLAYERS || starting}
-            onClick={async () => {
-              if (starting) return
-              setStarting(true); setError(null)
-              try { await startGame(code, playerToken) }
-              catch (e) { setError(errorCode(e)) }
-              finally { setStarting(false) }
-            }}
-          >
-            Start carving
-          </button>
-          {players.length < MIN_PLAYERS && (
-            <p style={{ color: 'var(--shell-muted)' }}>Need at least {MIN_PLAYERS} players.</p>
+        <div className="lobby-actions">
+          {isHost ? (
+            <>
+              <button
+                className="btn-neon"
+                disabled={players.length < MIN_PLAYERS || starting}
+                onClick={async () => {
+                  if (starting) return
+                  setStarting(true); setError(null)
+                  try { await startGame(code, playerToken) }
+                  catch (e) { setError(errorCode(e)) }
+                  finally { setStarting(false) }
+                }}
+              >
+                Start carving
+              </button>
+              {players.length < MIN_PLAYERS && (
+                <p className="lobby-note">Need at least {MIN_PLAYERS} players.</p>
+              )}
+            </>
+          ) : (
+            <p className="lobby-note">
+              Waiting for the host to start<span className="dots" aria-hidden="true" />
+            </p>
           )}
-        </>
-      ) : (
-        <p>Waiting for the host to start…</p>
-      )}
 
-      {error && <p role="alert">{humanize(error)}</p>}
+          {error && <p className="join-error" role="alert">{humanize(error)}</p>}
 
-      {onLeave && <button onClick={onLeave}>Leave room</button>}
+          {onLeave && <button className="btn-quiet" onClick={onLeave}>Leave room</button>}
+        </div>
+      </div>
     </main>
   )
 }

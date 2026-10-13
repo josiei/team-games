@@ -258,3 +258,189 @@
   .neon-flicker { animation: none; }
   .btn-neon, .btn-ghost { transition: none; }
 }
+
+/* --- the waiting room ---------------------------------------------------- */
+
+.code-sign {
+  width: 100%;
+  padding: 18px 20px 20px;
+  text-align: center;
+  border-radius: 16px;
+  background: #000;
+  background: color-mix(in srgb, #000 70%, transparent);
+  border: 2px solid #8A6A2E;
+  border: 2px solid color-mix(in srgb, var(--neon-glow) 45%, transparent);
+  box-shadow:
+    0 0 10px color-mix(in srgb, var(--neon-tube) 35%, transparent),
+    inset 0 0 16px color-mix(in srgb, var(--neon-tube) 14%, transparent);
+}
+
+.code-sign-label,
+.code-sign-hint {
+  margin: 0;
+  font-size: 0.78rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--shell-muted);
+}
+
+.code-sign-hint { margin-top: 8px; text-transform: none; letter-spacing: 0; }
+
+/* The one thing in the room that someone has to read aloud or paste. */
+.code-sign .room-code {
+  margin: 4px 0 0;
+  color: #FFF4E8;
+  text-shadow:
+    0 0 2px #FFF,
+    0 0 10px var(--neon-glow),
+    0 0 24px var(--neon-tube),
+    0 0 48px var(--neon-tube);
+  animation: code-breathe 4s ease-in-out infinite;
+}
+
+@keyframes code-breathe {
+  50% { opacity: 0.82; }
+}
+
+/* --- roster -------------------------------------------------------------- */
+
+.roster {
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 8px;
+}
+
+.roster-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: #1A1826;
+  background: color-mix(in srgb, var(--shell-surface) 88%, transparent);
+  border: 1px solid var(--shell-border);
+  /* Each row lands a beat after the one above, so a player joining mid-wait
+     arrives with a visible pop rather than silently appearing. `backwards`
+     holds the start frame through the delay. */
+  animation: seat-pop 320ms cubic-bezier(0.2, 1.4, 0.4, 1) backwards;
+  animation-delay: calc(var(--i, 0) * 55ms);
+}
+
+@keyframes seat-pop {
+  from { opacity: 0; transform: translateY(8px) scale(0.96); }
+}
+
+.roster-row.is-empty {
+  background: transparent;
+  border-style: dashed;
+  border-color: #241F33;
+}
+
+.roster-name { font-size: 1rem; }
+.roster-name.is-quiet { color: var(--shell-muted); font-weight: 400; }
+
+.roster-tag {
+  margin-left: auto;
+  padding: 3px 9px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  border-radius: 999px;
+  color: #1A0E04;
+  background: var(--neon-glow);
+}
+
+/* `margin-left: auto` on both would split them apart; only the first pushes. */
+.roster-tag + .roster-tag { margin-left: 6px; }
+
+.roster-tag.is-quiet {
+  color: var(--shell-muted);
+  background: transparent;
+  border: 1px solid var(--shell-border);
+}
+
+.pip {
+  width: 34px;
+  height: 34px;
+  flex: none;
+  /* Out of phase with its neighbours, so the row bobs like a shelf of
+     pumpkins rather than pulsing in unison. */
+  animation: pip-bob 3.2s ease-in-out infinite;
+  animation-delay: calc(var(--i, 0) * -400ms);
+}
+
+.pip.is-offline { filter: grayscale(1); opacity: 0.45; animation: none; }
+
+@keyframes pip-bob {
+  50% { transform: translateY(-3px) rotate(-2deg); }
+}
+
+.pip-empty {
+  width: 34px;
+  height: 34px;
+  flex: none;
+  border-radius: 50%;
+  border: 1px dashed #2E2B3F;
+}
+
+/* --- waiting state ------------------------------------------------------- */
+
+.lobby-actions {
+  width: 100%;
+  display: grid;
+  gap: 10px;
+  justify-items: stretch;
+}
+
+.lobby-note {
+  margin: 0;
+  text-align: center;
+  color: var(--shell-muted);
+}
+
+.reconnecting {
+  margin: 0;
+  text-align: center;
+  color: var(--neon-glow);
+}
+
+/* Three dots that fill in and reset, so a wait never looks frozen. */
+.dots::after {
+  content: '…';
+  display: inline-block;
+  width: 1.2em;
+  text-align: left;
+  animation: dots-cycle 1.4s steps(4, end) infinite;
+  clip-path: inset(0 100% 0 0);
+}
+
+@keyframes dots-cycle {
+  to { clip-path: inset(0 0 0 0); }
+}
+
+.btn-quiet {
+  padding: 10px 16px;
+  font: inherit;
+  color: var(--shell-muted);
+  background: transparent;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  justify-self: center;
+}
+
+.btn-quiet:hover { color: var(--shell-text); }
+
+.btn-quiet:focus-visible {
+  outline: 3px solid var(--neon-glow);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .roster-row, .pip, .dots::after, .code-sign .room-code { animation: none; }
+  .dots::after { clip-path: none; }
+}
