@@ -1,0 +1,113 @@
+import type { FastifyInstance } from 'fastify'
+import { generateCode, newId, normalizeCode, type RoomId } from '@tg/shared'
+import { GAMES, getGame } from '../games/registry.js'
+import { RoomRuntime } from '../rooms/runtime.js'
+import type { InMemoryRoomStore } from '../rooms/store.js'
+import type { Repo } from '../db/repo.js'
+
+export const MAX_DISPLAY_NAME = 24
+
+export type AppDeps = {
+  repo: Repo
+  store: InMemoryRoomStore
+  runtimes: Map<RoomId, RoomRuntime>
+  send?: (to: string, message: unknown) => void
+}
+
+export function registerRoomRoutes(app: FastifyInstance, deps: AppDeps): void {
+  const { repo, store, runtimes } = deps
+
+  app.get('/api/games', async () =>
+    GAMES.map(g => ({
+      id: g.id, name: g.name, description: g.description,
+      minPlayers: g.minPlayers, maxPlayers: g.maxPlayers,
+      estimatedMinutes: g.estimatedMinutes, theme: g.theme,
+    })))
+
+  app.post('/api/rooms', async (request, reply) => {
+    const { gameId } = (request.body ?? {}) as { gameId?: string }
+    const game = gameId ? getGame(gameId) : null
+    if (!game) return reply.code(404).send({ code: 'UNKNOWN_GAME' })
+
+    const workspaceId = repo.ensureDefaultWorkspace()
+    const code = generateCode(c => repo.isCodeTaken(c) || store.byCode(c) !== null)
+    const row = repo.createRoom({ workspaceId, code, gameId: game.id })
+    const live = store.create({ workspaceId, code, gameId: game.id })
+    // The in-memory room and the db row MUST share one id. Repo.addPlayer and
+    // Repo.saveResult look the room up by id scoped to its workspace, so if the
+    // ids diverged every player join (and result save) would throw.
+    live.id = row.id
+
+    return { code, roomId: live.id }
+  })
+
+  app.post('/api/rooms/:code/join', async (request, reply) => {
+    const code = normalizeCode((request.params as { code: string }).code)
+    const { displayName: rawName, playerToken } =
+      (request.body ?? {}) as { displayName?: string; playerToken?: string }
+
+    const live = store.byCode(code)
+    if (!live) return reply.code(404).send({ code: 'ROOM_NOT_FOUND' })
+
+    // Idempotent re-join (e.g. a browser refresh): a token that resolves to a
+    // player already in THIS room returns that player unchanged. Tokens from
+    // other rooms never match because we only search this room's players.
+    if (typeof playerToken === 'string' && playerToken.length > 0) {
+      const existing = [...live.players.values()].find(p => p.token === playerToken)
+      if (existing) {
+        return { roomId: live.id, playerId: existing.id, playerToken: existing.token }
+      }
+    }
+
+    const displayName = (rawName ?? '').trim()
+    if (displayName.length === 0) return reply.code(400).send({ code: 'NAME_REQUIRED' })
+    if (displayName.length > MAX_DISPLAY_NAME) {
+      return reply.code(400).send({ code: 'NAME_TOO_LONG' })
+    }
+
+    const game = getGame(live.gameId)!
+    if (live.players.size >= game.maxPlayers) {
+      return reply.code(409).send({ code: 'ROOM_FULL' })
+    }
+
+    const token = newId()
+    const player = store.addPlayer(live, { displayName, token })
+    repo.addPlayer({
+      workspaceId: live.workspaceId, roomId: live.id, displayName, token,
+    })
+    repo.setHost(live.workspaceId, live.id, live.hostId)
+
+    runtimes.get(live.id)?.onConnect(player.id)
+
+    return { roomId: live.id, playerId: player.id, playerToken: token }
+  })
+
+  app.post('/api/rooms/:code/start', async (request, reply) => {
+    const code = normalizeCode((request.params as { code: string }).code)
+    const { playerToken } = (request.body ?? {}) as { playerToken?: string }
+
+    const live = store.byCode(code)
+    if (!live) return reply.code(404).send({ code: 'ROOM_NOT_FOUND' })
+
+    const caller = [...live.players.values()].find(p => p.token === playerToken)
+    if (!caller || caller.id !== live.hostId) {
+      return reply.code(403).send({ code: 'NOT_HOST' })
+    }
+
+    const game = getGame(live.gameId)!
+    if (store.participants(live).length < game.minPlayers) {
+      return reply.code(409).send({ code: 'NOT_ENOUGH_PLAYERS' })
+    }
+
+    let runtime = runtimes.get(live.id)
+    if (!runtime) {
+      runtime = new RoomRuntime({
+        room: live, store, repo, module: game,
+        send: (to, message) => deps.send?.(to, message),
+      })
+      runtimes.set(live.id, runtime)
+    }
+    runtime.start()
+    return { ok: true }
+  })
+}
