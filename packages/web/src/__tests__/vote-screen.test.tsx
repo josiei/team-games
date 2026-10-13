@@ -6,12 +6,14 @@ import { asPlayerId } from '@tg/shared'
 import { PumpkinThumb } from '../games/pumpkin/PumpkinThumb.js'
 
 const NAMES = /Zephyrine|Quillfeather|Bartholomew|Gnarlwick/
-/** Text and every attribute value of every node under `root` that match a name. */
-const leaks = (root: Element): string[] => {
+/** Identifiable hits: 'text', or 'attr:<name>@<TAG>' for each attribute value matching a name. */
+const leaks = (root: Element, walk = true): string[] => {
   const hits: string[] = []
-  if (NAMES.test(root.textContent ?? '')) hits.push('textContent')
-  for (const el of [root, ...Array.from(root.querySelectorAll('*'))])
-    for (const a of Array.from(el.attributes)) if (NAMES.test(a.value)) hits.push(a.name)
+  if (NAMES.test(root.textContent ?? '')) hits.push('text')
+  const els = walk ? [root, ...Array.from(root.querySelectorAll('*'))] : [root]
+  for (const el of els)
+    for (const a of Array.from(el.attributes))
+      if (NAMES.test(a.value)) hits.push(`attr:${a.name}@${el.tagName}`)
   return hits
 }
 
@@ -67,13 +69,21 @@ describe('VoteScreen', () => {
     expect(leaks(container)).toEqual([])
   })
 
-  it('control: the leak scan catches a name passed as a caption or attribute', () => {
+  it('control: the scan reports a leaked caption by source, text and nested aria-label', () => {
     const { container } = render(
-      <PumpkinThumb entry={entry(0)} caption="Zephyrine Quillfeather" onClick={() => {}} />)
-    expect(leaks(container).length).toBeGreaterThan(0)
-    const hidden = document.createElement('div')
-    hidden.setAttribute('data-owner', 'Bartholomew Gnarlwick')
-    expect(leaks(hidden)).toEqual(['data-owner'])
+      <div><PumpkinThumb entry={entry(0)} caption="Zephyrine Quillfeather" onClick={() => {}} /></div>)
+    const hits = leaks(container)
+    expect(hits).toContain('text')
+    expect(hits).toContain('attr:aria-label@BUTTON')
+  })
+
+  it('control: a name in a NESTED attribute is caught only by the descendant walk', () => {
+    const root = document.createElement('div')
+    const child = document.createElement('span')
+    child.setAttribute('data-owner', 'Bartholomew Gnarlwick')
+    root.appendChild(child)
+    expect(leaks(root)).toEqual(['attr:data-owner@SPAN'])
+    expect(leaks(root, false)).toEqual([])   // proves the walk is what finds it
   })
 
   it('dispatches a vote for the clicked slot', () => {
