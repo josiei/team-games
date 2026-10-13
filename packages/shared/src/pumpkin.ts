@@ -119,7 +119,46 @@ export function reduce(
         },
       }
     }
-    default:
-      return state                              // VOTE handled in Task 6
+    case 'VOTE': {
+      const award = AWARD_BY_PHASE[state.phase]
+      if (!award || award !== action.award) return state      // wrong phase for this award
+      if (!Number.isInteger(action.slot)) return state
+      if (action.slot < 0 || action.slot >= state.slots.length) return state
+      if (state.slots[action.slot] === by) return state        // no self-votes
+      return {
+        ...state,
+        votes: {
+          ...state.votes,
+          [award]: { ...state.votes[award], [by]: action.slot },
+        },
+      }
+    }
   }
+}
+
+export type AwardResult = { slot: number; votes: number } | null
+
+/**
+ * Winner per award. Ties break to the lower slot index so results are
+ * reproducible. Returns null when an award drew no valid votes — which
+ * happens in a one-player room, or when everyone disconnects mid-vote.
+ */
+export function tally(state: PumpkinState): Record<AwardKey, AwardResult> {
+  const results = {} as Record<AwardKey, AwardResult>
+
+  for (const award of AWARD_KEYS) {
+    const counts = new Map<number, number>()
+    for (const slot of Object.values(state.votes[award])) {
+      counts.set(slot, (counts.get(slot) ?? 0) + 1)
+    }
+
+    let best: AwardResult = null
+    for (const [slot, votes] of counts) {
+      if (!best || votes > best.votes || (votes === best.votes && slot < best.slot)) {
+        best = { slot, votes }
+      }
+    }
+    results[award] = best
+  }
+  return results
 }
