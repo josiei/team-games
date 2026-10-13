@@ -4,7 +4,9 @@ import {
 } from '@tg/shared'
 import { useConnection } from '../../store/connection.js'
 import { HostLine } from '../../ui/HostLine.js'
+import { Spiral } from '../../ui/Spiral.js'
 import { PumpkinThumb } from './PumpkinThumb.js'
+import '../../theme/neon.css'
 
 type ResultsView = {
   kind: 'results'
@@ -29,14 +31,13 @@ export function ResultsScreen() {
   }
 
   return (
-    <main style={{ maxWidth: 960, margin: '0 auto', padding: 16 }}>
-      <h2 style={{ fontFamily: 'var(--font-game)' }}>Results</h2>
+    <main className="game-stage results-stage">
+      <Spiral />
+      <div className="game-inner">
+      <h2 className="game-title">Results</h2>
       <HostLine />
 
-      <section aria-label="Awards" style={{
-        display: 'grid', gap: 12,
-        gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-      }}>
+      <section aria-label="Awards" className="award-grid">
         {AWARD_KEYS.map(award => {
           const winner = view.winners[award]
           const entry = winner ? view.gallery.find(g => g.slot === winner.slot) : undefined
@@ -44,9 +45,9 @@ export function ResultsScreen() {
           return (
             <div
               key={award} role="group" aria-labelledby={headingId}
-              className="surface" style={{ padding: 12 }}
+              className="award-card"
             >
-              <h3 id={headingId} style={{ margin: '0 0 8px', fontSize: 16 }}>
+              <h3 id={headingId} className="award-name">
                 {AWARD_LABELS[award]}
               </h3>
               {winner ? (
@@ -60,12 +61,12 @@ export function ResultsScreen() {
                       Pumpkin unavailable ({nameFor(winner.slot)})
                     </p>
                   )}
-                  <p style={{ margin: '8px 0 0', color: 'var(--shell-muted)' }}>
+                  <p className="award-votes">
                     {winner.votes} {winner.votes === 1 ? 'vote' : 'votes'}
                   </p>
                 </>
               ) : (
-                <p style={{ color: 'var(--shell-muted)' }}>No votes cast</p>
+                <p className="award-votes">No votes cast</p>
               )}
             </div>
           )
@@ -73,11 +74,8 @@ export function ResultsScreen() {
       </section>
 
       <section aria-labelledby="all-pumpkins">
-        <h3 id="all-pumpkins" style={{ marginTop: 32 }}>Everyone&apos;s pumpkins</h3>
-        <div style={{
-          display: 'grid', gap: 12,
-          gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))',
-        }}>
+        <h3 id="all-pumpkins" className="section-title">Everyone&apos;s pumpkins</h3>
+        <div className="gallery-grid">
           {view.gallery.map(entry => (
             <PumpkinThumb
               key={entry.slot}
@@ -87,6 +85,7 @@ export function ResultsScreen() {
           ))}
         </div>
       </section>
+      </div>
     </main>
   )
 }

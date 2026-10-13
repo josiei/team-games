@@ -12,6 +12,7 @@ import {
   allStrokes, beginStroke, clearDraft, emptyDraft, endStroke,
   extendStroke, isFull, loadDraft, saveDraft, undo, type DraftState,
 } from './strokes.js'
+import '../../theme/neon.css'
 
 /** The carve meter is a slowly moving bar: recompute carvedRatio at ~10Hz, paint at full rate. */
 const METER_INTERVAL_MS = 100
@@ -236,10 +237,12 @@ export function CarveScreen({ roomId }: { roomId: string }) {
 
   if (submitted) {
     return (
-      <main style={{ textAlign: 'center', padding: 24 }}>
-        <h2>Carved.</h2>
-        <p>{carving.submittedCount} of {carving.totalPlayers} done.</p>
-        <HostLine />
+      <main className="game-stage">
+        <div className="game-inner is-narrow panel panel-centred">
+          <h2 className="game-title">Carved.</h2>
+          <p>{carving.submittedCount} of {carving.totalPlayers} done.</p>
+          <HostLine />
+        </div>
       </main>
     )
   }
@@ -248,18 +251,20 @@ export function CarveScreen({ roomId }: { roomId: string }) {
     [(clientX - rect.left) / rect.width, (clientY - rect.top) / rect.height]
 
   return (
-    <main style={{ maxWidth: 560, margin: '0 auto', padding: 16 }}>
-      <header style={{ display: 'flex', justifyContent: 'space-between' }}>
-        <h2 style={{ fontFamily: 'var(--font-game)', margin: 0 }}>Carve</h2>
+    <main className="game-stage">
+      <div className="game-inner is-narrow">
+      <header className="game-head">
+        <h2 className="game-title">Carve</h2>
         <Timer />
       </header>
 
+      <div className="carve-frame">
       <canvas
         ref={canvasRef}
         width={CANVAS_W}
         height={CANVAS_H}
         aria-label="Pumpkin carving canvas"
-        style={{ width: '100%', touchAction: 'none', cursor: 'crosshair' }}
+        style={{ touchAction: 'none', cursor: 'crosshair' }}
         onPointerDown={e => {
           // Primary button only, and only one pointer at a time: a palm or a
           // second finger must not replace the stroke in progress.
@@ -301,11 +306,12 @@ export function CarveScreen({ roomId }: { roomId: string }) {
           commit()
         }}
       />
+      </div>
 
       <LiveMeter register={meterRef} />
 
       {/* Always mounted: a live region inserted together with its text is often not announced. */}
-      <p role="status" style={{ margin: '8px 0 0', fontWeight: 600, minHeight: '1.2em' }}>
+      <p role="status" className="game-status">
         {full
           ? 'This pumpkin is full. Undo a stroke to keep carving, or submit it.'
           : unsent
@@ -313,18 +319,18 @@ export function CarveScreen({ roomId }: { roomId: string }) {
             : ''}
       </p>
 
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 12 }}>
-        <button aria-pressed={tool === 'cut'} onClick={() => setTool('cut')}>Cut</button>
-        <button aria-pressed={tool === 'uncut'} onClick={() => setTool('uncut')}>Uncarve</button>
-        <button aria-pressed={tool === 'stamp'} onClick={() => setTool('stamp')}>Stamp</button>
+      <div className="toolbar">
+        <button className="tool-btn" aria-pressed={tool === 'cut'} onClick={() => setTool('cut')}>Cut</button>
+        <button className="tool-btn" aria-pressed={tool === 'uncut'} onClick={() => setTool('uncut')}>Uncarve</button>
+        <button className="tool-btn" aria-pressed={tool === 'stamp'} onClick={() => setTool('stamp')}>Stamp</button>
         {tool === 'stamp' && STAMPS.map(s => (
-          <button key={s} aria-pressed={shape === s} onClick={() => setShape(s)}>{s}</button>
+          <button className="tool-btn" key={s} aria-pressed={shape === s} onClick={() => setShape(s)}>{s}</button>
         ))}
-        <label>Size
+        <label className="size-field">Size
           <input type="range" min={0.03} max={0.25} step={0.01} value={size}
             onChange={e => setSize(Number(e.target.value))} />
         </label>
-        <button onClick={() => {
+        <button className="tool-btn" onClick={() => {
           draftRef.current = undo(draftRef.current)
           pointerRef.current = null
           rebuildRef.current = true
@@ -336,11 +342,12 @@ export function CarveScreen({ roomId }: { roomId: string }) {
         </button>
       </div>
 
-      <button style={{ marginTop: 16, width: '100%' }} onClick={submit}>
+      <button className="btn-neon" style={{ marginTop: 16, width: '100%' }} onClick={submit}>
         Submit pumpkin ({strokeCount} strokes)
       </button>
 
       <HostLine />
+      </div>
     </main>
   )
 }

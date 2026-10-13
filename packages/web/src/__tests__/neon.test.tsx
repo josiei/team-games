@@ -3,7 +3,7 @@ import { render, screen } from '@testing-library/react'
 import { DEFAULT_TAGLINE, TAGLINES, pickTagline } from '../lobby/taglines.js'
 import { NeonSign } from '../ui/NeonSign.js'
 import { Spiral } from '../ui/Spiral.js'
-import { pipColor } from '../ui/PlayerPip.js'
+import { PALETTE, pipColor, pipHash } from '../ui/PlayerPip.js'
 
 describe('taglines', () => {
   it('leads with the default, which is what a screenshot catches', () => {

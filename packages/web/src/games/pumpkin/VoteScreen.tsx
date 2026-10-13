@@ -4,6 +4,7 @@ import { useConnection } from '../../store/connection.js'
 import { Timer } from '../../ui/Timer.js'
 import { HostLine } from '../../ui/HostLine.js'
 import { PumpkinThumb } from './PumpkinThumb.js'
+import '../../theme/neon.css'
 
 export function VoteScreen() {
   const view = useConnection(s => s.view) as PumpkinView | null
@@ -12,10 +13,12 @@ export function VoteScreen() {
 
   if (view?.kind === 'spectator') {
     return (
-      <main style={{ textAlign: 'center', padding: 32 }}>
-        <h2>Watching this one</h2>
-        <p>You joined mid-game — you&apos;re in the next round.</p>
-        <HostLine />
+      <main className="game-stage">
+        <div className="game-inner is-narrow panel panel-centred">
+          <h2 className="game-title">Watching this one</h2>
+          <p>You joined mid-game — you&apos;re in the next round.</p>
+          <HostLine />
+        </div>
       </main>
     )
   }
@@ -25,9 +28,10 @@ export function VoteScreen() {
   if (view?.kind !== 'voting') return null
 
   return (
-    <main style={{ maxWidth: 960, margin: '0 auto', padding: 16 }}>
-      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-        <h2 style={{ fontFamily: 'var(--font-game)', margin: 0 }}>
+    <main className="game-stage">
+      <div className="game-inner">
+      <header className="game-head">
+        <h2 className="game-title">
           {AWARD_LABELS[view.award]}
         </h2>
         <Timer />
@@ -36,14 +40,11 @@ export function VoteScreen() {
       <HostLine />
 
       {/* Always mounted so the live region is announced when its text appears. */}
-      <p role="status" style={{ margin: '8px 0 0', fontWeight: 600, minHeight: '1.2em' }}>
+      <p role="status" className="game-status">
         {unsentAward === view.award ? 'Vote not sent \u2014 reconnecting. Tap again once you are back.' : ''}
       </p>
 
-      <div style={{
-        display: 'grid', gap: 12, marginTop: 16,
-        gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))',
-      }}>
+      <div className="gallery-grid">
         {view.gallery.map(entry => {
           const isMine = entry.slot === view.mySlot
           return (
@@ -58,6 +59,7 @@ export function VoteScreen() {
             />
           )
         })}
+      </div>
       </div>
     </main>
   )

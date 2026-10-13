@@ -3,6 +3,7 @@ import { fireEvent, render, screen } from '@testing-library/react'
 import { Lobby } from '../lobby/Lobby.js'
 import { JoinScreen } from '../lobby/JoinScreen.js'
 import { useConnection } from '../store/connection.js'
+import { pipHash } from '../ui/PlayerPip.js'
 import { asPlayerId, asRoomCode } from '@tg/shared'
 
 const ME = asPlayerId('me')
@@ -133,6 +134,38 @@ describe('Lobby roster', () => {
     const indices = [...container.querySelectorAll('.roster-row')]
       .map(row => (row as HTMLElement).style.getPropertyValue('--i'))
     expect(indices).toEqual(['0', '1'])
+  })
+
+  it('counts an open seat into the stagger, so it lands after the players', () => {
+    useConnection.setState({ players: [player(ME, 'Jocelyn', 1)] })
+    const { container } = render(<Lobby code={asRoomCode('AB2CD3')} playerToken="t" />)
+    const indices = [...container.querySelectorAll('.roster-row')]
+      .map(row => (row as HTMLElement).style.getPropertyValue('--i'))
+    expect(indices).toEqual(['0', '1'])
+  })
+
+  it('phases each pumpkin off its own id, not its row, so a leave cannot shift it', () => {
+    const { container, rerender } = render(<Lobby code={asRoomCode('AB2CD3')} playerToken="t" />)
+    const phaseOf = (i: number) =>
+      (container.querySelectorAll('svg.pip')[i] as HTMLElement).style.getPropertyValue('--phase')
+    // Pinned to the id's own hash, so a constant or an index would both fail.
+    expect(phaseOf(0)).toBe(String(pipHash(ME) % 8))
+    expect(phaseOf(1)).toBe(String(pipHash(OTHER) % 8))
+
+    // The player above leaves. Sam's row index drops to 0; the pumpkin's phase
+    // must not move with it, or every pumpkin below a leaver jumps mid-bob.
+    useConnection.setState({ players: [player(OTHER, 'Sam', 2)] })
+    rerender(<Lobby code={asRoomCode('AB2CD3')} playerToken="t" />)
+    expect(phaseOf(0)).toBe(String(pipHash(OTHER) % 8))
+  })
+
+  it('tags the host and marks an offline player', () => {
+    useConnection.setState({
+      players: [player(ME, 'Jocelyn', 1), { ...player(OTHER, 'Sam', 2), connected: false }],
+    })
+    const { container } = render(<Lobby code={asRoomCode('AB2CD3')} playerToken="t" />)
+    expect(screen.getByText('host').className).toContain('roster-tag')
+    expect(container.querySelector('svg.pip.is-offline')).toBeTruthy()
   })
 
   it('keeps the pumpkins out of the accessibility tree', () => {

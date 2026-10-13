@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, type CSSProperties } from 'react'
 import type { RoomCode } from '@tg/shared'
 import { useConnection } from '../store/connection.js'
 import { HostLine } from '../ui/HostLine.js'
@@ -42,7 +42,7 @@ export function Lobby({ code, playerToken, onLeave }: {
 
         <ul className="roster">
           {ordered.map((player, index) => (
-            <li key={player.id} className="roster-row" style={{ '--i': index } as React.CSSProperties}>
+            <li key={player.id} className="roster-row" style={{ '--i': index } as CSSProperties}>
               <PlayerPip id={player.id} connected={player.connected} />
               <strong className="roster-name" style={{ opacity: player.connected ? 1 : 0.5 }}>
                 {labels[player.id] ?? player.displayName}
@@ -53,7 +53,7 @@ export function Lobby({ code, playerToken, onLeave }: {
           ))}
           {Array.from({ length: openSeats }, (_, n) => (
             <li key={`seat-${n}`} className="roster-row is-empty"
-              style={{ '--i': ordered.length + n } as React.CSSProperties}>
+              style={{ '--i': ordered.length + n } as CSSProperties}>
               <span className="pip-empty" aria-hidden="true" />
               <span className="roster-name is-quiet">Open seat</span>
             </li>

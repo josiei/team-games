@@ -23,7 +23,11 @@
 /* --- backdrop ------------------------------------------------------------ */
 
 .spiral {
-  position: absolute;
+  /* Fixed, not absolute: at 150vmax it is far larger than the page, and an
+     absolutely positioned box that size inflates the document to a screenful
+     of scrollable empty backdrop below the content. Fixed also keeps it
+     steady while a long gallery scrolls over it. */
+  position: fixed;
   left: 50%;
   top: 50%;
   /* Square, and wider than the stage's diagonal, so the corners never sweep
@@ -80,6 +84,7 @@
   background: color-mix(in srgb, #000 72%, transparent);
   border: 2px solid #8A6A2E;
   border: 2px solid color-mix(in srgb, var(--neon-glow) 55%, transparent);
+  box-shadow: 0 0 12px #7A3A0C;
   box-shadow:
     0 0 10px color-mix(in srgb, var(--neon-tube) 45%, transparent),
     0 0 36px color-mix(in srgb, var(--neon-tube) 22%, transparent),
@@ -217,6 +222,7 @@
   background: var(--neon-tube);
   border: 1px solid #D9A44A;
   border: 1px solid color-mix(in srgb, var(--neon-glow) 70%, transparent);
+  box-shadow: 0 0 14px #8A3F0C;
   box-shadow: 0 0 14px color-mix(in srgb, var(--neon-tube) 50%, transparent);
 }
 
@@ -270,6 +276,7 @@
   background: color-mix(in srgb, #000 70%, transparent);
   border: 2px solid #8A6A2E;
   border: 2px solid color-mix(in srgb, var(--neon-glow) 45%, transparent);
+  box-shadow: 0 0 10px #6B3209;
   box-shadow:
     0 0 10px color-mix(in srgb, var(--neon-tube) 35%, transparent),
     inset 0 0 16px color-mix(in srgb, var(--neon-tube) 14%, transparent);
@@ -339,7 +346,13 @@
   border-color: #241F33;
 }
 
-.roster-name { font-size: 1rem; }
+.roster-name {
+  font-size: 1rem;
+  /* A 24-character name plus pip, tags and gaps is wider than the row at phone
+     width; without these it pushes the tags out instead of wrapping. */
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
 .roster-name.is-quiet { color: var(--shell-muted); font-weight: 400; }
 
 .roster-tag {
@@ -354,8 +367,9 @@
   background: var(--neon-glow);
 }
 
-/* `margin-left: auto` on both would split them apart; only the first pushes. */
-.roster-tag + .roster-tag { margin-left: 6px; }
+/* Only the first tag pushes; a player who is both host and offline shows the
+   two side by side. Negative, because the flex `gap` already adds 12px. */
+.roster-tag + .roster-tag { margin-left: -6px; }
 
 .roster-tag.is-quiet {
   color: var(--shell-muted);
@@ -367,10 +381,13 @@
   width: 34px;
   height: 34px;
   flex: none;
-  /* Out of phase with its neighbours, so the row bobs like a shelf of
-     pumpkins rather than pulsing in unison. */
+  /* Out of phase with its neighbours, so the row bobs like a shelf of pumpkins
+     rather than pulsing in unison. The phase comes from the player's own id
+     (--phase), never the row index: an index-based delay shifts when somebody
+     leaves, and changing a negative delay mid-animation makes every pumpkin
+     below them jump. */
   animation: pip-bob 3.2s ease-in-out infinite;
-  animation-delay: calc(var(--i, 0) * -400ms);
+  animation-delay: calc(var(--phase, 0) * -400ms);
 }
 
 .pip.is-offline { filter: grayscale(1); opacity: 0.45; animation: none; }
@@ -443,4 +460,192 @@
 @media (prefers-reduced-motion: reduce) {
   .roster-row, .pip, .dots::after, .code-sign .room-code { animation: none; }
   .dots::after { clip-path: none; }
+}
+
+/* --- in-game screens ----------------------------------------------------- */
+
+/* Carving and voting get a calm backdrop: the pumpkins are the thing to look
+   at, and a turning spiral behind a drawing surface is a distraction. Results
+   gets the spiral back, because that screen is the party. */
+.game-stage {
+  position: relative;
+  min-height: 100vh;
+  min-height: 100dvh;
+  padding: 20px 16px 40px;
+  background:
+    radial-gradient(ellipse 80% 55% at 50% 0%,
+      color-mix(in srgb, var(--accent) 12%, transparent), transparent 70%);
+}
+
+.game-inner {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 960px;
+  margin: 0 auto;
+}
+
+.game-inner.is-narrow { max-width: 560px; }
+
+.game-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 16px;
+  margin-bottom: 14px;
+}
+
+.game-title {
+  margin: 0;
+  font-family: var(--font-game);
+  font-weight: 400;
+  font-size: clamp(1.35rem, 4.5vw, 2rem);
+  letter-spacing: 0.04em;
+  color: #FFF4E8;
+  text-shadow:
+    0 0 8px var(--glow),
+    0 0 22px var(--accent),
+    0 0 44px var(--accent);
+}
+
+.game-status {
+  margin: 10px 0 0;
+  min-height: 1.2em;
+  font-weight: 600;
+  color: var(--glow);
+}
+
+.panel {
+  padding: 16px;
+  border-radius: 14px;
+  background: #1A1826;
+  background: color-mix(in srgb, var(--shell-surface) 90%, transparent);
+  border: 1px solid var(--shell-border);
+}
+
+.panel-centred { text-align: center; padding: 40px 24px; }
+
+/* --- carving ------------------------------------------------------------- */
+
+.carve-frame {
+  position: relative;
+  margin-bottom: 12px;
+  display: flex;
+  justify-content: center;
+  border-radius: 16px;
+  overflow: hidden;
+  background: #000;
+  background: color-mix(in srgb, #000 55%, var(--shell-bg));
+  border: 1px solid var(--shell-border);
+  box-shadow: inset 0 0 40px color-mix(in srgb, var(--accent) 10%, transparent);
+}
+
+.carve-frame canvas {
+  display: block;
+  margin: 0 auto;
+  /* Bounded by the viewport's height, not just its width. The canvas is 512x640,
+     so at a 560px column it stands 700px tall and pushes the integrity meter and
+     the tools off a laptop screen — and the meter is the whole game. */
+  width: auto;
+  height: auto;
+  max-width: 100%;
+  max-height: 58dvh;
+}
+
+.toolbar {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-top: 14px;
+}
+
+.tool-btn {
+  padding: 9px 14px;
+  font: inherit;
+  font-weight: 600;
+  color: var(--shell-text);
+  background: #1A1826;
+  background: color-mix(in srgb, var(--shell-surface) 90%, transparent);
+  border: 1px solid var(--shell-border);
+  border-radius: 999px;
+  cursor: pointer;
+  transition: border-color 120ms ease, background-color 120ms ease, color 120ms ease;
+}
+
+.tool-btn:hover:not(:disabled) { border-color: color-mix(in srgb, var(--accent) 60%, transparent); }
+
+/* aria-pressed is the source of truth for which tool is live, so style from it
+   rather than from a second class that could drift out of step with it. */
+.tool-btn[aria-pressed='true'] {
+  color: #1A0E04;
+  background: var(--accent);
+  border-color: var(--glow);
+  box-shadow: 0 0 12px color-mix(in srgb, var(--accent) 50%, transparent);
+}
+
+.tool-btn:focus-visible,
+.size-field input:focus-visible {
+  outline: 3px solid var(--glow);
+  outline-offset: 2px;
+}
+
+.size-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+  font-size: 0.8rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--shell-muted);
+}
+
+.size-field input { accent-color: var(--accent); }
+
+/* --- voting and results -------------------------------------------------- */
+
+.gallery-grid {
+  display: grid;
+  gap: 12px;
+  margin-top: 16px;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+}
+
+.award-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+}
+
+.award-card {
+  padding: 14px;
+  border-radius: 14px;
+  background: #1A1826;
+  background: color-mix(in srgb, var(--shell-surface) 92%, transparent);
+  border: 1px solid var(--shell-border);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--glow) 12%, transparent);
+}
+
+.award-name {
+  margin: 0 0 10px;
+  font-family: var(--font-display);
+  font-size: 0.95rem;
+  letter-spacing: 0.04em;
+  color: var(--glow);
+}
+
+.award-votes {
+  margin: 10px 0 0;
+  font-size: 0.85rem;
+  color: var(--shell-muted);
+}
+
+.section-title {
+  margin: 30px 0 0;
+  font-family: var(--font-display);
+  font-size: 1rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--shell-muted);
 }
