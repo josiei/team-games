@@ -9,10 +9,11 @@ const CLOSE_REPLACED = 4001
 const CLOSE_BAD_TOKEN = 4003
 const CLOSE_NO_ROOM = 4004
 
-// Largest legitimate frame is a carve stroke list (~12 bytes per point as
-// JSON, so 256 KiB is ~20k points), far beyond a three-minute carve. Anything
-// larger is rejected at the protocol level instead of being buffered.
-export const MAX_PAYLOAD = 256 * 1024
+// Largest legitimate frame is a carve stroke list. A quantized 10k-point list
+// is ~120 KB and an unquantized one ~400 KB, so 1 MiB leaves headroom for both
+// while still bounding a hostile client: anything larger is rejected at the
+// protocol level instead of being buffered.
+export const MAX_PAYLOAD = 1024 * 1024
 export const HEARTBEAT_MS = 30_000
 
 export function attachSocketServer(
