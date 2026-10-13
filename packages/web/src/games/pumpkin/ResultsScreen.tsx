@@ -49,7 +49,7 @@ export function ResultsScreen() {
               </h3>
               {winner && entry ? (
                 <>
-                  <PumpkinThumb entry={entry} caption={nameFor(winner.slot)} disabled />
+                  <PumpkinThumb entry={entry} caption={nameFor(winner.slot)} />
                   <p style={{ margin: '8px 0 0', color: 'var(--shell-muted)' }}>
                     {winner.votes} {winner.votes === 1 ? 'vote' : 'votes'}
                   </p>
@@ -73,7 +73,6 @@ export function ResultsScreen() {
               key={entry.slot}
               entry={entry}
               caption={nameFor(entry.slot)}
-              disabled
             />
           ))}
         </div>

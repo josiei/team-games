@@ -64,10 +64,13 @@ describe('ResultsScreen', () => {
   it('reveals the carver under every pumpkin, not only winners', () => {
     setView({ gallery: [entry(0), entry(1), entry(2)], carvers: { 0: ME, 1: OTHER, 2: OTHER } })
     render(<ResultsScreen />)
-    const buttons = gallery().getAllByRole('button', { name: /pumpkin/i })
-    expect(buttons).toHaveLength(3)
-    expect(buttons.map(b => b.textContent)).toEqual(['Jocelyn', 'Jocelyn (2)', 'Jocelyn (2)'])
-    expect(buttons.every(b => (b as HTMLButtonElement).disabled)).toBe(true)
+    const thumbs = gallery().getAllByRole('img', { name: /pumpkin/i })
+    expect(thumbs).toHaveLength(3)
+    expect(thumbs.map(b => b.textContent)).toEqual(['Jocelyn', 'Jocelyn (2)', 'Jocelyn (2)'])
+    // Display-only: not focusable toggle buttons, and not dimmed.
+    expect(gallery().queryAllByRole('button')).toHaveLength(0)
+    expect(thumbs.every(b => b.getAttribute('aria-pressed') === null)).toBe(true)
+    expect(thumbs.every(b => b.style.opacity === '1')).toBe(true)
   })
 
   it('does not crash when a winning slot has no carver recorded', () => {

@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, type CSSProperties } from 'react'
 import { CANVAS_H, CANVAS_W, type GalleryEntry } from '@tg/shared'
 import { renderPumpkin } from './canvas.js'
 
@@ -8,13 +8,19 @@ const INTEGRITY_TEXT = {
   solid: '', sagging: 'Sagging', collapsed: 'Collapsed',
 } as const
 
+/**
+ * Interactive when `onClick` is given (a toggle button); otherwise a static,
+ * non-focusable image. `dimmed` defaults to `disabled`, so a display-only
+ * thumb is never dimmed unless asked.
+ */
 export function PumpkinThumb({
-  entry, caption, selected, disabled, onClick,
+  entry, caption, selected, disabled, dimmed, onClick,
 }: {
   entry: GalleryEntry
   caption?: string | undefined
   selected?: boolean
   disabled?: boolean
+  dimmed?: boolean
   onClick?(): void
 }) {
   const ref = useRef<HTMLCanvasElement>(null)
@@ -25,30 +31,58 @@ export function PumpkinThumb({
     renderPumpkin(ctx, entry.strokes, THEME)
   }, [entry.strokes])
 
+  const state = INTEGRITY_TEXT[entry.integrity]
+  // The accessible name carries the caption and the state, so assistive tech
+  // hears what sighted users read ("Yours", "Collapsed").
+  const name = [`Pumpkin ${entry.slot + 1}`, caption, state].filter(Boolean).join(', ')
+  const interactive = onClick !== undefined
+  const faded = dimmed ?? disabled ?? false
+
+  const style: CSSProperties = {
+    padding: 8,
+    cursor: interactive && !disabled ? 'pointer' : 'default',
+    opacity: faded ? 0.55 : 1,
+    // Selection uses border + ring, never `outline`, so the browser's
+    // keyboard focus ring stays visible and distinct.
+    border: selected ? '3px solid var(--accent)' : '3px solid transparent',
+    boxShadow: selected ? '0 0 0 2px var(--glow)' : 'none',
+    // A collapsed pumpkin slumps, so it reads as failed before the
+    // caption is read. Shape, not colour, carries the meaning.
+    transform: entry.integrity === 'collapsed'
+      ? 'rotate(-6deg) scaleY(0.86)'
+      : entry.integrity === 'sagging' ? 'scaleY(0.96)' : 'none',
+    transition: 'transform 200ms ease-out',
+  }
+
+  const body = (
+    <>
+      <canvas ref={ref} width={CANVAS_W} height={CANVAS_H} style={{ width: '100%' }} aria-hidden="true" />
+      <span style={{ display: 'block', fontSize: 13, color: 'var(--shell-muted)' }}>
+        {selected ? '\u2713 ' : ''}{caption}
+        {caption && state ? ' \u00b7 ' : ''}{state}
+      </span>
+    </>
+  )
+
+  if (!interactive) {
+    return (
+      <div role="img" aria-label={name} className="surface"
+        data-integrity={entry.integrity} style={style}>
+        {body}
+      </div>
+    )
+  }
   return (
     <button
-      aria-label={`Pumpkin ${entry.slot + 1}`}
+      aria-label={name}
       aria-pressed={selected ?? false}
       disabled={disabled ?? false}
       onClick={onClick}
       className="surface"
       data-integrity={entry.integrity}
-      style={{
-        padding: 8, cursor: disabled ? 'default' : 'pointer',
-        outline: selected ? '3px solid var(--accent)' : 'none',
-        opacity: disabled ? 0.55 : 1,
-        // A collapsed pumpkin slumps, so it reads as failed before the
-        // caption is read. Shape, not colour, carries the meaning.
-        transform: entry.integrity === 'collapsed'
-          ? 'rotate(-6deg) scaleY(0.86)'
-          : entry.integrity === 'sagging' ? 'scaleY(0.96)' : 'none',
-        transition: 'transform 200ms ease-out',
-      }}
+      style={style}
     >
-      <canvas ref={ref} width={CANVAS_W} height={CANVAS_H} style={{ width: '100%' }} />
-      <span style={{ display: 'block', fontSize: 13, color: 'var(--shell-muted)' }}>
-        {caption ?? INTEGRITY_TEXT[entry.integrity]}
-      </span>
+      {body}
     </button>
   )
 }
