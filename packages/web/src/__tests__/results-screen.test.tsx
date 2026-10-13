@@ -165,3 +165,17 @@ describe('ResultsScreen reveal gate', () => {
     expect(screen.getByRole('group', { name: /Scariest/ })).toBeTruthy()
   })
 })
+
+describe('leaving a finished game', () => {
+  afterEach(() => { vi.unstubAllGlobals(); sessionStorage.clear() })
+
+  it('offers a way out, so the results screen is not a dead end', () => {
+    // Nothing else on this screen navigates, and the game is over: without
+    // this the only escape from a finished room is clearing storage.
+    const onLeave = vi.fn()
+    setView()
+    render(<ResultsScreen onLeave={onLeave} />)
+    screen.getByRole('button', { name: /back to the start/i }).click()
+    expect(onLeave).toHaveBeenCalledTimes(1)
+  })
+})

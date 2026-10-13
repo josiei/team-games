@@ -19,7 +19,7 @@ type ResultsView = {
 
 const UNKNOWN_CARVER = 'Unknown carver'
 
-export function ResultsScreen() {
+export function ResultsScreen({ onLeave }: { onLeave?: () => void } = {}) {
   const view = useConnection(s => s.view) as ResultsView
   const labels = useConnection(s => s.labels)
   // Decided once per mount, but remembered for the browsing session: a refresh
@@ -98,6 +98,14 @@ export function ResultsScreen() {
           ))}
         </div>
       </section>
+
+      {/* Without this the room is a dead end: the game is over, every other
+          screen is unreachable, and only clearing storage gets you out. */}
+      {onLeave && (
+        <div className="results-exit">
+          <button className="btn-neon" onClick={onLeave}>Back to the start</button>
+        </div>
+      )}
       </div>
     </main>
   )

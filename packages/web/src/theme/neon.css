@@ -650,6 +650,14 @@
   color: var(--shell-muted);
 }
 
+.results-exit {
+  display: flex;
+  justify-content: center;
+  margin-top: 28px;
+}
+
+.results-exit .btn-neon { min-width: 240px; }
+
 /* --- the catwalk --------------------------------------------------------- */
 
 /* Durations come from --act-ms, which Catwalk.tsx sets on the stage from
