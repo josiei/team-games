@@ -108,14 +108,9 @@ export function registerRoomRoutes(app: FastifyInstance, deps: AppDeps): void {
       })
       runtimes.set(live.id, runtime)
     }
-    try {
-      runtime.start()
-    } catch (err) {
-      if (err instanceof Error && err.message === 'Room already started') {
-        return reply.code(409).send({ code: 'ALREADY_STARTED' })
-      }
-      throw err
-    }
+    if (runtime.hasStarted) return reply.code(409).send({ code: 'ALREADY_STARTED' })
+    // Genuine failures (disposed room, failed phase entry) surface as 500.
+    runtime.start()
     return { ok: true }
   })
 }

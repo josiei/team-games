@@ -44,6 +44,7 @@ export class RoomRuntime {
   }
 
   get phase(): string { return this.room.phase }
+  get hasStarted(): boolean { return this.started }
 
   start(): void {
     if (this.disposed) throw new Error('Room disposed')

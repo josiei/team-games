@@ -3,6 +3,8 @@ import type { FastifyInstance } from 'fastify'
 import { buildApp } from '../app.js'
 import { InMemoryRoomStore } from '../rooms/store.js'
 import { Repo } from '../db/repo.js'
+import { RoomRuntime } from '../rooms/runtime.js'
+import { getGame } from '../games/registry.js'
 import { createDb } from '../db/client.js'
 
 let app: FastifyInstance
@@ -231,6 +233,31 @@ describe('id consistency between memory and database', () => {
 })
 
 describe('robustness', () => {
+  it('does not report a disposed, unstarted room as ALREADY_STARTED', async () => {
+    const runtimes = new Map()
+    const localStore = new InMemoryRoomStore()
+    const local = buildApp({ repo, store: localStore, runtimes })
+    const created = (await local.inject({
+      method: 'POST', url: '/api/rooms', payload: { gameId: 'pumpkin-carve' },
+    })).json() as { code: string; roomId: string }
+    const j = (n: string) => local.inject({
+      method: 'POST', url: `/api/rooms/${created.code}/join`, payload: { displayName: n },
+    })
+    const host = (await j('Host')).json() as { playerToken: string }
+    await j('Other')
+    const live = localStore.byCode(created.code as never)!
+    const rt = new RoomRuntime({
+      room: live, store: localStore, repo, module: getGame('pumpkin-carve')!, send: () => {},
+    })
+    rt.dispose()
+    runtimes.set(live.id, rt)
+    const res = await local.inject({
+      method: 'POST', url: `/api/rooms/${created.code}/start`,
+      payload: { playerToken: host.playerToken },
+    })
+    expect(res.statusCode).toBe(500)
+  })
+
   it('returns 409 ALREADY_STARTED on a second start', async () => {
     const { code } = await createRoom()
     const host = (await join(code, 'Host')).json() as { playerToken: string }
