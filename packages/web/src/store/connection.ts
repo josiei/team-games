@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import type { ClientMessage, Player, PlayerId, ServerMessage } from '@tg/shared'
 
-export type Status = 'idle' | 'connecting' | 'open' | 'reconnecting' | 'closed'
+export type Status = 'idle' | 'connecting' | 'open' | 'reconnecting' | 'closed' | 'taken-over'
 
 type State = {
   status: Status
@@ -57,37 +57,55 @@ export const useConnection = create<State & Actions>((set, get) => ({
   connect(roomId, playerId, token) {
     lastArgs = { roomId, playerId, token }
     if (retry) { clearTimeout(retry); retry = null }
+    // Detach the old socket first so its late events cannot touch this one.
+    const old = socket
+    socket = null
+    if (old) old.close()
     set({ status: attempt === 0 ? 'connecting' : 'reconnecting', me: playerId })
 
     const protocol = location.protocol === 'https:' ? 'wss' : 'ws'
-    socket = new WebSocket(
+    const ws = new WebSocket(
       `${protocol}://${location.host}/ws?room=${roomId}&token=${token}`)
+    socket = ws
 
-    socket.onopen = () => { attempt = 0; set({ status: 'open' }) }
+    ws.onopen = () => {
+      if (socket !== ws) return
+      attempt = 0
+      set({ status: 'open' })
+    }
 
-    socket.onmessage = event => {
+    ws.onmessage = event => {
+      if (socket !== ws) return
       try { get().applyMessage(JSON.parse(String(event.data)) as ServerMessage) }
       catch { /* a malformed frame must not break the game */ }
     }
 
-    socket.onclose = event => {
+    ws.onclose = event => {
+      if (socket !== ws) return   // stale socket: not ours any more
       socket = null
-      if (event.code === 4001) return set({ status: 'closed' })   // replaced by another tab
+      if (event.code === 4001) {   // replaced by another tab: terminal
+        lastArgs = null
+        return set({ status: 'taken-over' })
+      }
       if (!lastArgs) return set({ status: 'closed' })
       set({ status: 'reconnecting' })
+      if (retry) clearTimeout(retry)
       const delay = backoffMs(attempt++)
       retry = setTimeout(() => {
-        const args = lastArgs!
-        get().connect(args.roomId, args.playerId, args.token)
+        retry = null
+        const args = lastArgs
+        if (args) get().connect(args.roomId, args.playerId, args.token)
       }, delay)
     }
   },
 
   disconnect() {
     lastArgs = null
+    attempt = 0
     if (retry) { clearTimeout(retry); retry = null }
-    socket?.close()
+    const old = socket
     socket = null
+    old?.close()
     set({ status: 'closed' })
   },
 

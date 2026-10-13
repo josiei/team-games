@@ -13,6 +13,9 @@ import { useConnection } from './store/connection.js'
 export function App() {
   const status = useConnection(s => s.status)
   const view = useConnection(s => s.view) as PumpkinView | null
+  if (status === 'taken-over') {
+    return <p>This session was opened in another tab. Close this one or reload to take it back.</p>
+  }
   if (status === 'idle') return <p>Join screen arrives in Task 15.</p>
   if (!view) return <p>Connecting...</p>
   return <p>View: {view.kind}</p>

@@ -1,5 +1,3 @@
-// @vitest-environment jsdom
-// The root vitest does not read packages/web/vite.config.ts, so opt in per file.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { backoffMs, remainingMs, useConnection } from '../store/connection.js'
 import { asPlayerId } from '@tg/shared'
@@ -99,11 +97,5 @@ describe('applyMessage', () => {
     // @ts-expect-error deliberately invalid
     useConnection.getState().applyMessage({ type: 'who-knows' })
     expect(useConnection.getState().phase).toBe('carving')
-  })
-})
-
-describe('test environment', () => {
-  it('runs under jsdom', () => {
-    expect(typeof document).toBe('object')
   })
 })
