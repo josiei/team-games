@@ -1,3 +1,5 @@
 export * from './ids.js'
 export * from './code.js'
 export * from './carve.js'
+export * from './game.js'
+export * from './events.js'
