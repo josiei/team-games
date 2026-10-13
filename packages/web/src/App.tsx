@@ -3,6 +3,7 @@ import { asRoomCode, type PumpkinView, type RoomCode } from '@tg/shared'
 import { useConnection } from './store/connection.js'
 import { JoinScreen } from './lobby/JoinScreen.js'
 import { Lobby } from './lobby/Lobby.js'
+import { CarveScreen } from './games/pumpkin/CarveScreen.js'
 import { errorCode, humanize, joinRoom } from './lobby/api.js'
 import { clearSession, loadSession, saveSession, type StoredSession } from './lobby/session.js'
 
@@ -121,7 +122,8 @@ export function App() {
   if (view.kind === 'lobby') {
     return <Lobby code={asRoomCode(identity.code) as RoomCode} playerToken={identity.playerToken} onLeave={leave} />
   }
-  // Carve, vote, and results screens are wired in Tasks 16-18.
+  if (view.kind === 'carving') return <CarveScreen roomId={identity.roomId} />
+  // Vote and results screens are wired in Tasks 17-18.
   return <p>View: {view.kind}</p>
 }
 
