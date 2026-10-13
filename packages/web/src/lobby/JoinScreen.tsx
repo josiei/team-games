@@ -45,13 +45,12 @@ export function JoinScreen({
         <div className="join-card">
           <label htmlFor="name">Your name</label>
           <input id="name" value={name} maxLength={MAX_DISPLAY_NAME}
-            autoComplete="nickname" placeholder="Jocelyn"
+            autoComplete="nickname" placeholder="e.g. Sam"
             onChange={e => setName(e.target.value)} />
 
           <label htmlFor="code">Room code</label>
           <input id="code" className="code-field" value={code} maxLength={CODE_LENGTH + 1}
             autoComplete="off" autoCapitalize="characters" spellCheck={false}
-            placeholder={'•'.repeat(CODE_LENGTH)}
             onChange={e => setCode(e.target.value.toUpperCase())} />
 
           <div className="join-actions">

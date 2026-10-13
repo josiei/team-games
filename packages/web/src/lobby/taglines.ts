@@ -23,9 +23,9 @@ export type Tagline = (typeof TAGLINES)[number]
 export const DEFAULT_TAGLINE: Tagline = TAGLINES[0]
 
 /**
- * `random` is injectable so tests can pin the choice. Out-of-range values from
- * a hostile or broken source clamp to the default rather than returning
- * `undefined` into the sign.
+ * `random` is injectable so tests can pin the choice. Anything outside [0, 1)
+ * -- or NaN -- falls back to the default rather than putting `undefined` on the
+ * sign.
  */
 export function pickTagline(random: () => number = Math.random): Tagline {
   const index = Math.floor(random() * TAGLINES.length)

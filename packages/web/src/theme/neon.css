@@ -1,9 +1,18 @@
 /* The lobby's title screen: spiral backdrop, neon sign, and the join card.
    Everything here is decorative chrome for the pre-game screen; the in-game
-   screens keep their own styling. */
+   screens keep their own styling.
+
+   Colours come only from the shell's --neon-* / --spiral-ink tokens, never from
+   the per-game --accent/--glow, so the front door looks the same whichever game
+   ran last.
+
+   Every color-mix() declaration is preceded by a plain colour. Engines without
+   color-mix (Safari < 16.2, Firefox < 113) drop the whole declaration, which
+   would otherwise leave the inputs transparent and unreadable. */
 
 .lobby-stage {
   position: relative;
+  min-height: 100vh;
   min-height: 100dvh;
   display: grid;
   place-items: center;
@@ -15,30 +24,25 @@
 
 .spiral {
   position: absolute;
-  /* Exactly covers the stage. No oversizing is needed: the path is drawn out
-     to the viewBox corners, and `slice` scales the square viewBox to cover, so
-     the spiral still reaches every edge as it turns. (Percentage width resolves
-     against the stage, not against an inset box -- oversizing with `inset`
-     alone leaves a bare corner.) */
-  inset: 0;
-  width: 100%;
-  height: 100%;
+  left: 50%;
+  top: 50%;
+  /* Square, and wider than the stage's diagonal, so the corners never sweep
+     into view as it turns. Spinning this box (rather than a group inside the
+     SVG) is the cheap way to do it: an HTML box gets its own compositor layer,
+     while an animated SVG child repaints the whole backdrop every frame. */
+  width: 150vmax;
+  height: 150vmax;
+  translate: -50% -50%;
   opacity: 0.8;
   pointer-events: none;
+  animation: spiral-spin 90s linear infinite;
+  will-change: transform;
 }
 
-.spiral-turn {
-  /* Rotate about the centre of the viewBox, which is where the spiral starts.
-     Without `transform-box`, an SVG group turns about its own bounding box --
-     and a spiral's bbox is nowhere near its origin, so the whole figure orbits
-     off the screen instead of spinning in place. */
-  transform-box: view-box;
-  transform-origin: 50% 50%;
-  animation: spiral-spin 90s linear infinite;
-}
+.spiral path { stroke: var(--spiral-ink); }
 
 @keyframes spiral-spin {
-  to { transform: rotate(360deg); }
+  to { rotate: 360deg; }
 }
 
 /* Falls the edges off into the page background so the spiral has no hard seam. */
@@ -72,8 +76,10 @@
   padding: 26px 22px 30px;
   text-align: center;
   border-radius: 18px;
+  background: #000;
   background: color-mix(in srgb, #000 72%, transparent);
-  border: 2px solid color-mix(in srgb, var(--glow) 55%, transparent);
+  border: 2px solid #8A6A2E;
+  border: 2px solid color-mix(in srgb, var(--neon-glow) 55%, transparent);
   box-shadow:
     0 0 10px color-mix(in srgb, var(--neon-tube) 45%, transparent),
     0 0 36px color-mix(in srgb, var(--neon-tube) 22%, transparent),
@@ -86,7 +92,8 @@
   position: absolute;
   inset: 7px;
   border-radius: 12px;
-  border: 1px solid color-mix(in srgb, var(--glow) 32%, transparent);
+  border: 1px solid #5B4A2A;
+  border: 1px solid color-mix(in srgb, var(--neon-glow) 32%, transparent);
   pointer-events: none;
 }
 
@@ -100,10 +107,10 @@
   color: #FFF4E8;
   text-shadow:
     0 0 2px #FFF,
-    0 0 9px var(--glow),
+    0 0 9px var(--neon-glow),
     0 0 20px var(--neon-tube),
     0 0 42px var(--neon-tube),
-    0 0 78px color-mix(in srgb, var(--neon-tube) 70%, transparent);
+    0 0 78px var(--neon-tube);
 }
 
 .neon-script {
@@ -117,16 +124,20 @@
     0 0 2px #FFF,
     0 0 10px var(--neon-script-ink),
     0 0 26px var(--neon-script-ink),
-    0 0 52px color-mix(in srgb, var(--neon-script-ink) 60%, transparent);
+    0 0 52px var(--neon-script-ink);
 }
 
-/* A real tube does not blink on a tidy schedule: the off-beats are uneven and
-   brief, and the letter never goes fully dark. */
+/* A real tube does not blink on a tidy schedule, so the off-beats are uneven
+   and brief. They are kept at least 300ms apart: three or more flashes inside
+   one second is the threshold WCAG 2.3.1 draws for photosensitive seizures, and
+   while one glyph is far too small an area to meet it, there is no reason to
+   sit near the line. Only opacity moves -- swapping the shadow stack out would
+   repaint the glow on every step. */
 .neon-flicker { animation: tube-flicker 7s infinite; }
 
 @keyframes tube-flicker {
-  0%, 41%, 43.5%, 45%, 47.5%, 62%, 64%, 100% { opacity: 1; }
-  42%, 44.2%, 46%, 63% { opacity: 0.35; text-shadow: 0 0 4px var(--glow); }
+  0%, 40%, 42%, 46.5%, 48.5%, 100% { opacity: 1; }
+  41%, 47.5% { opacity: 0.35; }
 }
 
 /* --- the join card ------------------------------------------------------- */
@@ -136,10 +147,10 @@
   padding: 22px 20px 24px;
   display: grid;
   gap: 6px;
+  background: #1A1826;
   background: color-mix(in srgb, var(--shell-surface) 88%, transparent);
   border: 1px solid var(--shell-border);
   border-radius: 14px;
-  backdrop-filter: blur(6px);
 }
 
 .join-card label {
@@ -158,16 +169,25 @@
   font: inherit;
   font-size: 1rem;
   color: var(--shell-text);
+  background: #09090D;
   background: color-mix(in srgb, #000 35%, var(--shell-bg));
   border: 1px solid var(--shell-border);
   border-radius: 10px;
-  outline: none;
+  /* Not `none`: a transparent outline is repainted as a system colour in
+     forced-colors mode, where border-color and box-shadow are overridden and a
+     focused field would otherwise show no indicator at all. */
+  outline: 2px solid transparent;
+  outline-offset: 2px;
   transition: border-color 120ms ease, box-shadow 120ms ease;
 }
 
+/* The UA default placeholder grey falls under 4.5:1 on this background. */
+.join-card input::placeholder { color: var(--shell-muted); opacity: 1; }
+
 .join-card input:focus-visible {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 28%, transparent);
+  border-color: var(--neon-tube);
+  outline-color: var(--neon-tube);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--neon-tube) 28%, transparent);
 }
 
 .join-card input.code-field {
@@ -194,14 +214,15 @@
 
 .btn-neon {
   color: #1A0E04;
-  background: var(--accent);
-  border: 1px solid color-mix(in srgb, var(--glow) 70%, transparent);
-  box-shadow: 0 0 14px color-mix(in srgb, var(--accent) 50%, transparent);
+  background: var(--neon-tube);
+  border: 1px solid #D9A44A;
+  border: 1px solid color-mix(in srgb, var(--neon-glow) 70%, transparent);
+  box-shadow: 0 0 14px color-mix(in srgb, var(--neon-tube) 50%, transparent);
 }
 
 .btn-neon:hover:not(:disabled) {
   transform: translateY(-1px);
-  box-shadow: 0 0 22px color-mix(in srgb, var(--accent) 70%, transparent);
+  box-shadow: 0 0 22px color-mix(in srgb, var(--neon-tube) 70%, transparent);
 }
 
 .btn-ghost {
@@ -211,8 +232,8 @@
 }
 
 .btn-ghost:hover:not(:disabled) {
-  border-color: color-mix(in srgb, var(--accent) 60%, transparent);
-  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  border-color: color-mix(in srgb, var(--neon-tube) 60%, transparent);
+  background: color-mix(in srgb, var(--neon-tube) 10%, transparent);
 }
 
 .btn-neon:disabled,
@@ -220,20 +241,20 @@
 
 .btn-neon:focus-visible,
 .btn-ghost:focus-visible {
-  outline: 3px solid color-mix(in srgb, var(--glow) 75%, transparent);
+  outline: 3px solid var(--neon-glow);
   outline-offset: 2px;
 }
 
 .join-error {
   margin: 12px 0 0;
-  color: var(--accent);
+  color: var(--neon-tube);
   font-size: 0.9rem;
 }
 
 /* --- motion -------------------------------------------------------------- */
 
 @media (prefers-reduced-motion: reduce) {
-  .spiral-turn { animation: none; }
+  .spiral { animation: none; will-change: auto; }
   .neon-flicker { animation: none; }
   .btn-neon, .btn-ghost { transition: none; }
 }
