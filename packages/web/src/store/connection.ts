@@ -19,7 +19,8 @@ type State = {
 type Actions = {
   connect(roomId: string, playerId: PlayerId, token: string): void
   disconnect(): void
-  dispatch(action: unknown): void
+  /** Returns true only if the message was actually written to an OPEN socket. */
+  dispatch(action: unknown): boolean
   applyMessage(message: ServerMessage): void
 }
 
@@ -110,9 +111,10 @@ export const useConnection = create<State & Actions>((set, get) => ({
   },
 
   dispatch(action) {
-    if (socket?.readyState !== WebSocket.OPEN) return
+    if (socket?.readyState !== WebSocket.OPEN) return false
     const message: ClientMessage = { type: 'action', payload: action }
     socket.send(JSON.stringify(message))
+    return true
   },
 
   applyMessage(message) {

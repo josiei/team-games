@@ -53,11 +53,15 @@ function committedPoints(strokes: Stroke[]): number {
 
 const totalPoints = (d: DraftState) =>
   committedPoints(d.strokes) + (d.active ? d.active.points.length : 0)
-const totalStrokes = (d: DraftState) => d.strokes.length + (d.active ? 1 : 0)
 
-/** True once the point or stroke ceiling is reached; the UI shows a cue. */
+/**
+ * True once no further input would be accepted: the point ceiling is reached
+ * (extendStroke refuses more points) or MAX_STROKES strokes are COMMITTED
+ * (beginStroke refuses a new one). The stroke being drawn is not counted, so
+ * the 800th stroke can still be finished; the cue and the behavior agree.
+ */
 export const isFull = (d: DraftState): boolean =>
-  totalPoints(d) >= MAX_POINTS || totalStrokes(d) >= MAX_STROKES
+  totalPoints(d) >= MAX_POINTS || d.strokes.length >= MAX_STROKES
 
 export function beginStroke(
   draft: DraftState,

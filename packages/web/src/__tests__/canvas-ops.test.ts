@@ -1,48 +1,98 @@
-import { describe, expect, it } from 'vitest'
-import { CANVAS_W, CANVAS_H, carvedRatio, type Stroke } from '@tg/shared'
-import { strokeOps } from '../games/pumpkin/canvas.js'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { CANVAS_H, CANVAS_W, carvedRatio, type Stroke } from '@tg/shared'
+import { PumpkinPainter, strokeOps } from '../games/pumpkin/canvas.js'
 
-// jsdom has no 2D context, and a test against a mocked one would test the
-// mock. The painter only ever executes `strokeOps`, so the ordering contract is
-// pinned here: replay the ops into an occupancy grid with carvedRatio's own
-// resolution and rule, and require the SAME answer as carvedRatio.
-const GX = 64, GY = 80
-function replayRatio(strokes: Stroke[]): number {
-  const grid = new Uint8Array(GX * GY)
-  for (const stroke of strokes) {
-    for (const op of strokeOps(stroke)) {
-      const px = op.x / CANVAS_W, py = op.y / CANVAS_H, radius = Math.max(op.r / CANVAS_W, 1 / GX)
-      for (let gy = 0; gy < GY; gy++) {
-        for (let gx = 0; gx < GX; gx++) {
-          const dx = (gx + 0.5) / GX - px, dy = (gy + 0.5) / GY - py
-          if (dx * dx + dy * dy <= radius * radius) grid[gy * GX + gx] = op.kind === 'cut' ? 1 : 0
-        }
-      }
-    }
+// jsdom has no 2D context, so rasterization is covered by the Playwright test.
+// What IS pinnable here is ORDER: the painter must apply strokes to the canvas
+// in chronological order. A recording context captures every circle the painter
+// fills (with its composite op), rebuilds that into strokes, and asks the real
+// `carvedRatio` -- the server's judge -- whether the result matches the
+// original. No grid rule is reimplemented; carvedRatio is the only oracle.
+type Fill = { op: string; x: number; y: number; r: number }
+
+function recordingContext() {
+  const fills: Fill[] = []
+  let pending: { x: number; y: number; r: number } | null = null
+  const ctx = {
+    globalCompositeOperation: 'source-over',
+    fillStyle: '',
+    setTransform() {}, clearRect() {}, save() {}, restore() {}, clip() {},
+    beginPath() { pending = null },
+    arc(x: number, y: number, r: number) { pending = { x, y, r } },
+    fill(path?: unknown) {
+      if (path === undefined && pending) fills.push({ op: ctx.globalCompositeOperation, ...pending })
+    },
   }
-  return grid.reduce((n, v) => n + v, 0) / grid.length
+  return { ctx, fills }
 }
 
-const at = (tool: Stroke['tool']): Stroke => ({ tool, size: 0.2, points: [[0.5, 0.5]] })
+const toStrokes = (fills: Fill[]): Stroke[] => fills.map(f => ({
+  tool: f.op === 'destination-out' ? 'cut' : 'uncut',
+  size: (f.r * 2) / CANVAS_W,
+  points: [[f.x / CANVAS_W, f.y / CANVAS_H]] as [number, number][],
+}))
 
-describe('stroke ops follow chronological order', () => {
-  it('cut -> uncut -> re-cut leaves the region CUT, matching carvedRatio', () => {
-    const strokes = [at('cut'), at('uncut'), at('cut')]
-    expect(carvedRatio(strokes)).toBeGreaterThan(0)
-    expect(replayRatio(strokes)).toBe(carvedRatio(strokes))
-  })
+let fake: ReturnType<typeof recordingContext>
+beforeEach(() => {
+  fake = recordingContext()
+  vi.stubGlobal('Path2D', class { ellipse() {} moveTo() {} lineTo() {} arc() {} rect() {} closePath() {} })
+  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(fake.ctx as never)
+})
+afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals() })
+
+const at = (tool: Stroke['tool'], size: number): Stroke => ({ tool, size, points: [[0.5, 0.5]] })
+const THEME = { accent: '#f70', glow: '#fc4', bg: '#000' }
+
+describe('PumpkinPainter applies strokes in chronological order', () => {
+  for (const size of [0.2, 0.03]) { // 0.03 is the slider minimum
+    it(`cut -> uncut -> re-cut ends CUT, matching carvedRatio (brush ${size})`, () => {
+      const strokes = [at('cut', size), at('uncut', size), at('cut', size)]
+      const expected = carvedRatio(strokes)
+      expect(expected).toBeGreaterThan(0)
+
+      const painter = new PumpkinPainter()
+      painter.sync(strokes, THEME)
+      expect(fake.fills.map(f => f.op)).toEqual(['destination-out', 'source-over', 'destination-out'])
+      expect(carvedRatio(toStrokes(fake.fills))).toBe(expected)
+    })
+
+    it(`incremental sync and a reset replay agree (brush ${size})`, () => {
+      const strokes = [at('cut', size), at('uncut', size), at('cut', size)]
+      const incremental = new PumpkinPainter()
+      for (let n = 1; n <= strokes.length; n++) incremental.sync(strokes.slice(0, n), THEME)
+      const incrementalFills = [...fake.fills]
+      expect(incrementalFills).toHaveLength(3) // each stroke applied exactly once
+
+      fake.fills.length = 0
+      incremental.reset()
+      incremental.sync(strokes, THEME)
+      expect(fake.fills).toEqual(incrementalFills)
+    })
+  }
 
   it('cut -> uncut leaves it restored, matching carvedRatio', () => {
-    const strokes = [at('cut'), at('uncut')]
+    const strokes = [at('cut', 0.2), at('uncut', 0.2)]
+    new PumpkinPainter().sync(strokes, THEME)
+    expect(carvedRatio(toStrokes(fake.fills))).toBe(carvedRatio(strokes))
     expect(carvedRatio(strokes)).toBe(0)
-    expect(replayRatio(strokes)).toBe(0)
   })
 
+  it('a stroke that grows between syncs paints only its new points', () => {
+    const s: Stroke = { tool: 'cut', size: 0.1, points: [[0.2, 0.2]] }
+    const painter = new PumpkinPainter()
+    painter.sync([s], THEME)
+    s.points.push([0.3, 0.3], [0.4, 0.4])
+    painter.sync([s], THEME)
+    painter.sync([s], THEME)
+    expect(fake.fills).toHaveLength(3)
+  })
+})
+
+describe('strokeOps', () => {
   it('emits ops stroke by stroke in array order, point by point', () => {
     const a: Stroke = { tool: 'cut', size: 0.1, points: [[0.1, 0.1], [0.2, 0.2]] }
     const b: Stroke = { tool: 'uncut', size: 0.1, points: [[0.3, 0.3]] }
-    const kinds = [a, b].flatMap(s => strokeOps(s)).map(o => o.kind)
-    expect(kinds).toEqual(['cut', 'cut', 'restore'])
+    expect([a, b].flatMap(s => strokeOps(s)).map(o => o.kind)).toEqual(['cut', 'cut', 'restore'])
   })
 
   it('resumes from a point index so only new points are applied', () => {

@@ -281,6 +281,28 @@ describe('quantization and thinning', () => {
     expect(bytes).toBeLessThan(400 * 1024)
   })
 
+  it('lets the stroke ceiling and the full cue agree: the last stroke can still be finished', () => {
+    let d = emptyDraft()
+    for (let i = 0; i < MAX_STROKES - 1; i++) d = endStroke(beginStroke(d, 'stamp', 0.03, 'circle', [0.5, 0.5]))
+    d = beginStroke(d, 'cut', 0.03, undefined, [0.1, 0.5])   // the MAX_STROKES-th stroke
+    expect(d.active).not.toBeNull()
+    expect(isFull(d)).toBe(false)                            // no cue while it is still being drawn
+    d = extendStroke(d, [0.4, 0.5])
+    expect(d.active!.points.length).toBeGreaterThan(1)       // and it still accepts points
+    d = endStroke(d)
+    expect(isFull(d)).toBe(true)
+    expect(beginStroke(d, 'cut', 0.03, undefined, [0.5, 0.5]).active).toBeNull()
+  })
+
+  it('refuses points exactly when the cue says full', () => {
+    const filler: Stroke[] = [{ tool: 'cut', size: 0.03, points: Array.from({ length: MAX_POINTS - 1 }, () => [0.9, 0.9] as [number, number]) }]
+    let d = beginStroke({ strokes: filler, active: null }, 'cut', 0.03, undefined, [0.1, 0.1])
+    expect(isFull(d)).toBe(true) // the begin point took the last slot
+    const n = d.active!.points.length
+    d = extendStroke(d, [0.9, 0.1])
+    expect(d.active!.points).toHaveLength(n)
+  })
+
   it('rejects malformed drafts instead of handing them to the renderer', () => {
     const bad = [
       [{ tool: 'cut' }],

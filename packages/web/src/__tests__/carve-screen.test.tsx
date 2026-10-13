@@ -2,7 +2,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, fireEvent, render, screen } from '@testing-library/react'
 import type { Stroke } from '@tg/shared'
 import { useConnection } from '../store/connection.js'
+import * as shared from '@tg/shared'
 import { AUTO_SUBMIT_MARGIN_MS, CarveScreen } from '../games/pumpkin/CarveScreen.js'
+
+vi.mock('@tg/shared', async importOriginal => {
+  const actual = await importOriginal<typeof import('@tg/shared')>()
+  return { ...actual, carvedRatio: vi.fn(actual.carvedRatio) }
+})
 
 class MemStorage {
   private m = new Map<string, string>()
@@ -48,8 +54,9 @@ beforeEach(() => {
     { left: 0, top: 0, width: 512, height: 640, right: 512, bottom: 640, x: 0, y: 0, toJSON() {} })
   // jsdom already returns null here (no 2D context); this only silences its "not implemented" log.
   vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null)
-  dispatch = vi.fn()
-  useConnection.setState({ view: carvingView, dispatch, endsAt: null, clockOffset: 0 } as never)
+  dispatch = vi.fn(() => true) // true == the socket accepted the message
+  vi.mocked(shared.carvedRatio).mockClear()
+  useConnection.setState({ view: carvingView, dispatch, endsAt: null, clockOffset: 0, status: 'open' } as never)
 })
 afterEach(() => {
   vi.useRealTimers(); vi.restoreAllMocks(); vi.unstubAllGlobals()
@@ -144,5 +151,90 @@ describe('deadline and draft lifecycle', () => {
     expect(sent('DRAFT')).toHaveLength(1)
     act(() => { vi.advanceTimersByTime(20_000) })
     expect(sent('DRAFT')).toHaveLength(1)         // unchanged since
+  })
+})
+
+describe('submit while the socket is down', () => {
+  const draw = () => { down(1, 100, 100); move(1, 160, 100); up(1) }
+
+  it('keeps the draft and leaves Submit usable when the send is dropped', () => {
+    render(<CarveScreen roomId="r1" />)
+    draw()
+    act(() => { /* let the debounced local save run */ })
+    dispatch.mockReturnValue(false)
+    fireEvent.click(screen.getByText(/Submit pumpkin/))
+    expect(screen.getByRole('status').textContent).toMatch(/will send when you reconnect/i)
+    // second click works once the socket is back
+    dispatch.mockReturnValue(true)
+    fireEvent.click(screen.getByText(/Submit pumpkin/))
+    expect(sent('SUBMIT')).toHaveLength(2)
+    expect(sent('SUBMIT')[1]!.strokes).toHaveLength(1)
+    expect(localStorage.getItem(KEY)).toBeNull() // cleared only after a send that landed
+  })
+
+  it('does not clear the stored draft when the send failed', () => {
+    vi.useFakeTimers()
+    render(<CarveScreen roomId="r1" />)
+    draw()
+    act(() => { vi.advanceTimersByTime(500) }) // debounced save
+    expect(localStorage.getItem(KEY)).not.toBeNull()
+    dispatch.mockReturnValue(false)
+    fireEvent.click(screen.getByText(/Submit pumpkin/))
+    expect(localStorage.getItem(KEY)).not.toBeNull()
+  })
+
+  it('a deadline submit that is dropped lands once the socket reopens', () => {
+    vi.useFakeTimers()
+    useConnection.setState({ endsAt: Date.now() + 5000, clockOffset: 0, status: 'reconnecting' } as never)
+    dispatch.mockReturnValue(false)
+    render(<CarveScreen roomId="r1" />)
+    draw()
+    act(() => { vi.advanceTimersByTime(6000) })   // deadline passes while disconnected
+    expect(sent('SUBMIT').length).toBeGreaterThan(0)
+    const failedAttempts = sent('SUBMIT').length
+    expect(localStorage.getItem(KEY)).not.toBeNull()
+    dispatch.mockReturnValue(true)
+    act(() => { useConnection.setState({ status: 'open' } as never) }) // reconnect, same deadline
+    expect(sent('SUBMIT').length).toBe(failedAttempts + 1)
+    expect(sent('SUBMIT').at(-1)!.strokes).toHaveLength(1)
+    expect(localStorage.getItem(KEY)).toBeNull()
+  })
+})
+
+describe('draft safety and live regions', () => {
+  it('does not clear the draft for a transient null view', () => {
+    localStorage.setItem(KEY, JSON.stringify([{ tool: 'cut', size: 0.1, points: [[0.5, 0.5]] }]))
+    render(<CarveScreen roomId="r1" />)
+    act(() => { useConnection.setState({ view: null } as never) })
+    expect(localStorage.getItem(KEY)).not.toBeNull()
+    act(() => { useConnection.setState({ view: carvingView } as never) })
+    expect(localStorage.getItem(KEY)).not.toBeNull()
+  })
+
+  it('keeps the status region mounted (empty) before it has anything to say', () => {
+    render(<CarveScreen roomId="r1" />)
+    expect(screen.getByRole('status').textContent).toBe('')
+  })
+})
+
+describe('meter throttling', () => {
+  it('recomputes carvedRatio at ~10Hz during a drag, and settles after it', () => {
+    vi.useFakeTimers()
+    render(<CarveScreen roomId="r1" />)
+    const calls = () => vi.mocked(shared.carvedRatio).mock.calls.length
+    const start = calls()
+    down(1, 50, 50)
+    for (let i = 1; i <= 120; i++) {           // ~2s of 60Hz moves
+      move(1, 50 + i * 3, 50 + (i % 5))
+      act(() => { vi.advanceTimersByTime(16) })
+    }
+    const during = calls() - start
+    expect(during).toBeGreaterThan(5)
+    expect(during).toBeLessThan(30)            // unthrottled would be ~120
+    up(1)
+    act(() => { vi.advanceTimersByTime(300) })
+    const settled = calls()
+    act(() => { vi.advanceTimersByTime(1000) })
+    expect(calls()).toBe(settled)              // and then goes quiet
   })
 })

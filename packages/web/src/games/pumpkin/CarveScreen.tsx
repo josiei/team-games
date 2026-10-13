@@ -13,6 +13,8 @@ import {
   extendStroke, isFull, loadDraft, saveDraft, undo, type DraftState,
 } from './strokes.js'
 
+/** The carve meter is a slowly moving bar: recompute carvedRatio at ~10Hz, paint at full rate. */
+const METER_INTERVAL_MS = 100
 const DRAFT_AUTOSAVE_MS = 10_000
 /** Local persistence is debounced so a big list is not stringified on every pointerup. */
 const LOCAL_SAVE_DEBOUNCE_MS = 400
@@ -45,8 +47,12 @@ export function CarveScreen({ roomId }: { roomId: string }) {
   const dispatch = useConnection(s => s.dispatch)
   const endsAt = useConnection(s => s.endsAt)
   const clockOffset = useConnection(s => s.clockOffset)
+  const status = useConnection(s => s.status)
   const carving = view?.kind === 'carving' ? view : null
   const inCarving = carving !== null
+  // Only an ACTUAL non-carving view counts as leaving. A null view (initial
+  // mount, reconnect before the first snapshot) says nothing.
+  const leftCarving = view != null && view.kind !== 'carving'
   const submitted = carving?.submitted ?? false
 
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -61,12 +67,29 @@ export function CarveScreen({ roomId }: { roomId: string }) {
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const sentRef = useRef(false)
   const fullRef = useRef(false)
+  const retryRef = useRef(false)          // a submit attempt failed; retry once the socket reopens
+  const meterTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const meterAtRef = useRef(0)
   const serverStrokes = carving?.myStrokes
   const [strokeCount, setStrokeCount] = useState(0)
   const [full, setFull] = useState(false)
+  const [unsent, setUnsent] = useState(false)
   const [tool, setTool] = useState<'cut' | 'uncut' | 'stamp'>('cut')
   const [shape, setShape] = useState<StampShape>('triangle')
   const [size, setSize] = useState(0.08)
+
+  /** carvedRatio is O(points x brush area); throttled, with a trailing call so the bar always settles. */
+  const updateMeter = () => {
+    if (meterTimerRef.current !== null) return
+    const wait = Math.max(0, METER_INTERVAL_MS - (performance.now() - meterAtRef.current))
+    const run = () => {
+      meterTimerRef.current = null
+      meterAtRef.current = performance.now()
+      meterRef.current?.(carvedRatio(allStrokes(draftRef.current)))
+    }
+    if (wait === 0) run()
+    else meterTimerRef.current = setTimeout(run, wait)
+  }
 
   /** Paint now: new points onto the canvas plus the meter. Never sets CarveScreen state per move. */
   const paint = () => {
@@ -80,7 +103,7 @@ export function CarveScreen({ roomId }: { roomId: string }) {
       painterRef.current.sync(strokes, THEME)
       painterRef.current.present(ctx, THEME)
     }
-    meterRef.current?.(carvedRatio(strokes))
+    updateMeter()
     if (!fullRef.current && isFull(draft)) { fullRef.current = true; setFull(true) } // once, not per move
   }
   /** At most one paint per animation frame, however many events arrive. */
@@ -111,14 +134,25 @@ export function CarveScreen({ roomId }: { roomId: string }) {
     afterChange()
   }
 
-  /** Final send. Includes an in-progress stroke, so nothing drawn is lost. */
+  /**
+   * Final send. Includes an in-progress stroke, so nothing drawn is lost.
+   * Nothing is latched or cleared until `dispatch` reports the message really
+   * went out: a closed socket silently drops it, and deleting the draft then
+   * would lose the pumpkin. On failure we stay usable and retry on reconnect.
+   */
   const submit = () => {
     if (sentRef.current) return
+    const committed = endStroke(draftRef.current).strokes
+    if (!dispatch({ type: 'SUBMIT', strokes: committed })) {
+      retryRef.current = true
+      setUnsent(true)
+      return
+    }
     sentRef.current = true
+    retryRef.current = false
+    setUnsent(false)
     cancelSave()
     pointerRef.current = null
-    const committed = endStroke(draftRef.current).strokes
-    dispatch({ type: 'SUBMIT', strokes: committed })
     clearDraft(roomId)
   }
   const submitRef = useRef(submit)
@@ -134,7 +168,12 @@ export function CarveScreen({ roomId }: { roomId: string }) {
     rebuildRef.current = true
     setStrokeCount(strokes.length)
     paint()
-    return () => { if (frameRef.current) cancelAnimationFrame(frameRef.current); frameRef.current = 0 }
+    return () => {
+      if (frameRef.current) cancelAnimationFrame(frameRef.current)
+      frameRef.current = 0
+      if (meterTimerRef.current !== null) clearTimeout(meterTimerRef.current)
+      meterTimerRef.current = null
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [roomId])
 
@@ -160,14 +199,23 @@ export function CarveScreen({ roomId }: { roomId: string }) {
     return () => clearTimeout(id)
   }, [inCarving, submitted, endsAt, clockOffset])
 
+  // Reconnect: if a submit failed, or the deadline has already passed without
+  // one landing, send it now that the socket is open again.
+  useEffect(() => {
+    if (status !== 'open' || !inCarving || submitted || sentRef.current) return
+    const due = endsAt !== null && remainingMs(endsAt, clockOffset) <= AUTO_SUBMIT_MARGIN_MS
+    if (retryRef.current || due) submitRef.current()
+  }, [status, inCarving, submitted, endsAt, clockOffset])
+
   // A room can host another round: never let this pumpkin's draft outlive the
   // carving view, however it ended (manual submit, timer, or phase change).
   useEffect(() => {
-    if (!inCarving || submitted) { cancelSave(); clearDraft(roomId) }
+    if (leftCarving || submitted) { cancelSave(); clearDraft(roomId) }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [inCarving, submitted, roomId])
+  }, [leftCarving, submitted, roomId])
   useEffect(() => () => {
-    if ((useConnection.getState().view as PumpkinView | null)?.kind !== 'carving') { cancelSave(); clearDraft(roomId) }
+    const v = useConnection.getState().view as PumpkinView | null
+    if (v != null && v.kind !== 'carving') { cancelSave(); clearDraft(roomId) }
     else if (saveTimerRef.current !== null) persistNow() // unmounted for another reason: keep the draft
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [roomId])
@@ -244,11 +292,14 @@ export function CarveScreen({ roomId }: { roomId: string }) {
 
       <LiveMeter register={meterRef} />
 
-      {full && (
-        <p role="status" style={{ margin: '8px 0 0', fontWeight: 600 }}>
-          This pumpkin is full. Undo a stroke to keep carving, or submit it.
-        </p>
-      )}
+      {/* Always mounted: a live region inserted together with its text is often not announced. */}
+      <p role="status" style={{ margin: '8px 0 0', fontWeight: 600, minHeight: '1.2em' }}>
+        {full
+          ? 'This pumpkin is full. Undo a stroke to keep carving, or submit it.'
+          : unsent
+            ? 'Connection lost. Your pumpkin is saved here and will send when you reconnect.'
+            : ''}
+      </p>
 
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 12 }}>
         <button aria-pressed={tool === 'cut'} onClick={() => setTool('cut')}>Cut</button>
