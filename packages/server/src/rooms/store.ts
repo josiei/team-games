@@ -34,6 +34,11 @@ export type LiveRoom = {
   hostId: PlayerId | null
   players: Map<PlayerId, RoomPlayer>
   config: RoomConfig
+  /**
+   * Set only by restoreRooms: the persisted phase deadline, consumed by
+   * RoomRuntime.resume(). undefined for rooms that were not restored.
+   */
+  restoredEndsAt?: number | null
 }
 
 export interface RoomStore {

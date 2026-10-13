@@ -202,6 +202,45 @@ export class RoomRuntime {
     this.clearModuleTimers()
   }
 
+  /** Sets the deadline and the one clock that ends this phase. */
+  private armPhaseTimer(phase: string, ms: number): void {
+    this.phaseEndsAt = Date.now() + ms
+    this.phaseTimer = setTimeout(() => {
+      this.phaseTimer = null
+      let ok = false
+      try { ok = this.tryAdvance() } catch (error) {
+        console.error(`[room ${this.room.id}] error advancing past ${phase}:`, error)
+      }
+      if (!ok) this.failRoom(`could not advance past ${phase}`)
+    }, ms)
+  }
+
+  /**
+   * Take over a room restored from a snapshot (it already has phase and
+   * state). Re-arms the phase clock for the time that was left, so the phase
+   * ends when it originally would have; a deadline that passed during the
+   * outage advances at once. Idempotent.
+   */
+  resume(): void {
+    if (this.disposed || this.started || this.room.state === null) return
+    this.started = true
+    const endsAt = this.room.restoredEndsAt ?? null
+    delete this.room.restoredEndsAt
+    if (endsAt === null) { this.phaseEndsAt = null; return }
+    const phase = this.room.phase
+    const remaining = endsAt - Date.now()
+    if (remaining > 0) {
+      this.armPhaseTimer(phase, remaining)
+      return
+    }
+    this.phaseEndsAt = null
+    let ok = false
+    try { ok = this.tryAdvance() } catch (error) {
+      console.error(`[room ${this.room.id}] error advancing past ${phase} on resume:`, error)
+    }
+    if (!ok) this.failRoom(`could not advance past ${phase}`)
+  }
+
   /** Returns false (having changed nothing) if the phase could not be entered. */
   private enterPhase(phase: string): boolean {
     // Validate before committing anything, so a bad setPhase cannot leave the
@@ -227,19 +266,8 @@ export class RoomRuntime {
     // The deadline is part of authoritative state and rides in every snapshot,
     // so no later snapshot can wipe it.
     const ms = this.room.config.phaseMs[phase]
-    if (ms !== undefined) {
-      this.phaseEndsAt = Date.now() + ms
-      this.phaseTimer = setTimeout(() => {
-        this.phaseTimer = null
-        let ok = false
-        try { ok = this.tryAdvance() } catch (error) {
-          console.error(`[room ${this.room.id}] error advancing past ${phase}:`, error)
-        }
-        if (!ok) this.failRoom(`could not advance past ${phase}`)
-      }, ms)
-    } else {
-      this.phaseEndsAt = null
-    }
+    if (ms !== undefined) this.armPhaseTimer(phase, ms)
+    else this.phaseEndsAt = null
 
     this.broadcastSnapshot()
 
@@ -261,6 +289,7 @@ export class RoomRuntime {
       phase: this.room.phase,
       state: this.room.state,
       participants: this.store.participants(this.room).map(p => p.id),
+      endsAt: this.phaseEndsAt,
     }))
   }
 

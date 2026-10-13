@@ -142,3 +142,85 @@ describe('snapshot persistence', () => {
     expect(restoreRooms(new Repo(createDb(':memory:')), new InMemoryRoomStore())).toBe(0)
   })
 })
+
+describe('resume after restore', () => {
+  /** Crash mid-carve with the deadline `leftMs` away, then restore into a fresh store. */
+  function crashAndRestore(leftMs: number) {
+    vi.useFakeTimers()
+    const db = createDb(':memory:')
+    const first = bootRoom(db)
+    first.runtime.start()
+    const playerId = [...first.room.players.keys()][0]!
+    first.runtime.dispatch(playerId, { type: 'SUBMIT', strokes })
+    first.runtime.dispose()
+    // Move the saved deadline: 180s phase, so rewrite it to the wanted offset.
+    first.repo.saveSnapshot({
+      workspaceId: first.workspaceId, roomId: first.room.id, phase: 'carving',
+      state: first.room.state, participants: [...first.room.players.keys()],
+      endsAt: Date.now() + leftMs,
+    })
+    const store = new InMemoryRoomStore()
+    const repo = new Repo(db)
+    restoreRooms(repo, store)
+    const room = store.byCode(asRoomCode('AB2CD3'))!
+    const sent: unknown[] = []
+    const runtime = new RoomRuntime({
+      room, store, repo, module: pumpkinModule, send: (_to, m) => sent.push(m),
+    })
+    return { room, runtime, sent, playerId, store }
+  }
+
+  it('persists the phase deadline with the snapshot', () => {
+    vi.useFakeTimers()
+    const first = bootRoom(createDb(':memory:'))
+    first.runtime.start()
+    expect(first.repo.loadSnapshots()[0]!.endsAt).toBe(Date.now() + 180_000)
+    first.runtime.dispose()
+  })
+
+  it('ends the phase when it originally would have', () => {
+    const { room, runtime } = crashAndRestore(60_000)
+    runtime.resume()
+    expect(runtime.hasStarted).toBe(true)
+    vi.advanceTimersByTime(59_000)
+    expect(room.phase).toBe('carving')
+    vi.advanceTimersByTime(1_000)
+    expect(room.phase).toBe('vote-scariest')
+    runtime.dispose()
+  })
+
+  it('advances immediately when the deadline passed during the outage', () => {
+    const { room, runtime } = crashAndRestore(-5_000)
+    runtime.resume()
+    expect(room.phase).toBe('vote-scariest')
+    runtime.dispose()
+  })
+
+  it('does not arm a second timer when resumed twice', () => {
+    const { runtime } = crashAndRestore(60_000)
+    runtime.resume()
+    const timers = vi.getTimerCount()
+    runtime.resume()
+    expect(vi.getTimerCount()).toBe(timers)
+    expect(timers).toBe(1)
+    runtime.dispose()
+  })
+
+  it('sends clients the remaining time, not a stale or null deadline', () => {
+    const { runtime, sent, playerId } = crashAndRestore(60_000)
+    runtime.resume()
+    const snap = runtime.snapshotFor(playerId) as { endsAt: number | null; serverNow: number }
+    expect(snap.endsAt).toBe(Date.now() + 60_000)
+    expect(snap.endsAt! - snap.serverNow).toBe(60_000)
+    expect(sent).toEqual([])   // resume itself is silent; onConnect broadcasts
+    runtime.dispose()
+  })
+
+  it('does nothing for a room that was never started', () => {
+    vi.useFakeTimers()
+    const { runtime } = bootRoom(createDb(':memory:'))
+    runtime.resume()
+    expect(runtime.hasStarted).toBe(false)
+    expect(vi.getTimerCount()).toBe(0)
+  })
+})

@@ -61,5 +61,7 @@ export const roomSnapshots = sqliteTable('room_snapshot', {
   state: text('state', { mode: 'json' }).notNull(),
   // Player ids that were participants (not spectators) when the snapshot was taken.
   participants: text('participants', { mode: 'json' }),
+  // Phase deadline (epoch ms); null for an untimed phase.
+  endsAt: integer('ends_at'),
   updatedAt: integer('updated_at').notNull(),
 }, t => [index('snapshot_ws_idx').on(t.workspaceId)])

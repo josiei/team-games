@@ -23,6 +23,7 @@ export function restoreRooms(repo: Repo, store: InMemoryRoomStore): number {
     room.phase = snapshot.phase
     room.state = snapshot.state
     room.hostId = row.hostPlayerId
+    room.restoredEndsAt = snapshot.endsAt ?? null
 
     // store.addPlayer would label everyone a spectator in a started room, so
     // the flag comes from the participant list saved with the snapshot. A

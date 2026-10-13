@@ -27,7 +27,7 @@ export type GameResultRow = {
 
 export type SnapshotRow = {
   roomId: RoomId; workspaceId: WorkspaceId; phase: string
-  state: unknown; participants: PlayerId[] | null; updatedAt: number
+  state: unknown; participants: PlayerId[] | null; endsAt: number | null; updatedAt: number
 }
 
 export class Repo {
@@ -165,19 +165,23 @@ export class Repo {
     workspaceId: WorkspaceId; roomId: RoomId; phase: string; state: unknown
     /** Ids of players who were participants (not spectators). */
     participants?: PlayerId[]
+    /** Phase deadline, epoch ms; null when the phase is untimed. */
+    endsAt?: number | null
   }): void {
     const now = Date.now()
     const participants = input.participants ?? null
+    const endsAt = input.endsAt ?? null
     this.db.insert(roomSnapshots).values({
       roomId: input.roomId,
       workspaceId: input.workspaceId,
       phase: input.phase,
       state: input.state,
       participants,
+      endsAt,
       updatedAt: now,
     }).onConflictDoUpdate({
       target: roomSnapshots.roomId,
-      set: { phase: input.phase, state: input.state, participants, updatedAt: now },
+      set: { phase: input.phase, state: input.state, participants, endsAt, updatedAt: now },
     }).run()
   }
 

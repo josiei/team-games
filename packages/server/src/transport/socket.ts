@@ -52,6 +52,8 @@ export function attachSocketServer(
       room, store: deps.store, repo: deps.repo, module: game, send: sendTo,
     })
     deps.runtimes.set(roomId, runtime)
+    // A room restored from a snapshot carries state but has no running clock.
+    if (room.state !== null) runtime.resume()
     return runtime
   }
 

@@ -108,7 +108,8 @@ export function registerRoomRoutes(app: FastifyInstance, deps: AppDeps): void {
       })
       runtimes.set(live.id, runtime)
     }
-    if (runtime.hasStarted) return reply.code(409).send({ code: 'ALREADY_STARTED' })
+    // A restored room has state but no started runtime yet; it is in progress.
+    if (runtime.hasStarted || live.state !== null) return reply.code(409).send({ code: 'ALREADY_STARTED' })
     // Genuine failures (disposed room, failed phase entry) surface as 500.
     runtime.start()
     return { ok: true }
