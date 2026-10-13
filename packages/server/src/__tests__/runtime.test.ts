@@ -4,7 +4,7 @@ import { RoomRuntime } from '../rooms/runtime.js'
 import { pumpkinModule } from '../games/pumpkin/index.js'
 import { createDb } from '../db/client.js'
 import { Repo } from '../db/repo.js'
-import { asRoomCode, newId, type ServerMessage, type PlayerId } from '@tg/shared'
+import { asRoomCode, newId, type GameModule, type ServerMessage, type PlayerId } from '@tg/shared'
 
 let store: InMemoryRoomStore
 let repo: Repo
@@ -36,6 +36,8 @@ beforeEach(() => {
 
 afterEach(() => { runtime.dispose(); vi.useRealTimers() })
 
+type Snap = Extract<ServerMessage, { type: 'snapshot' }>
+
 const strokes = [{ tool: 'cut' as const, size: 0.1, points: [[0.5, 0.5]] as [number, number][] }]
 
 describe('start', () => {
@@ -51,20 +53,51 @@ describe('start', () => {
     for (const id of ids) expect(recipients).toContain(id)
   })
 
-  it('sends the snapshot before the timer, so the deadline is not wiped', () => {
+  it('carries the deadline in every snapshot of a timed phase', () => {
     runtime.start()
-    const firstSnapshot = sent.findIndex(s => s.message.type === 'snapshot')
-    const firstTimer = sent.findIndex(s => s.message.type === 'timer')
-    expect(firstSnapshot).toBeLessThan(firstTimer)
+    const snaps = sent.filter(s => s.message.type === 'snapshot')
+      .map(s => s.message as Snap)
+    expect(snaps.length).toBe(ids.length)
+    for (const snap of snaps) {
+      expect(snap.endsAt).not.toBeNull()
+      expect(snap.endsAt! - snap.serverNow).toBe(180_000)
+    }
   })
 
-  it('sends an absolute deadline rather than a tick stream', () => {
+  it('sends no separate timer message', () => {
     runtime.start()
-    const timers = sent.filter(s => s.message.type === 'timer')
-    expect(timers.length).toBe(ids.length)
-    const timer = timers[0]!.message as Extract<ServerMessage, { type: 'timer' }>
-    expect(timer.endsAt).toBeGreaterThan(timer.serverNow)
-    expect(timer.endsAt - timer.serverNow).toBe(180_000)
+    expect(sent.some(s => (s.message as { type: string }).type === 'timer')).toBe(false)
+  })
+
+  it('carries endsAt: null in a phase with no configured duration', () => {
+    const room = store.all()[0]!
+    room.config = { phaseMs: {} }
+    runtime.start()
+    const snap = runtime.snapshotFor(ids[0]!) as Snap
+    expect(snap.endsAt).toBeNull()
+  })
+
+  it('keeps the ORIGINAL deadline in snapshots sent after a mid-phase action', () => {
+    runtime.start()
+    const original = (runtime.snapshotFor(ids[0]!) as Snap).endsAt!
+    vi.advanceTimersByTime(10_000)
+    sent.length = 0
+    runtime.dispatch(ids[0]!, { type: 'SUBMIT', strokes })
+    const snaps = sent.filter(s => s.message.type === 'snapshot').map(s => s.message as Snap)
+    expect(snaps.length).toBe(ids.length)
+    for (const snap of snaps) {
+      expect(snap.endsAt).toBe(original)
+      expect(snap.endsAt! - snap.serverNow).toBe(170_000)
+    }
+  })
+
+  it('keeps the original deadline across connect and disconnect snapshots', () => {
+    runtime.start()
+    const original = (runtime.snapshotFor(ids[0]!) as Snap).endsAt!
+    vi.advanceTimersByTime(5_000)
+    runtime.onDisconnect(ids[2]!)
+    runtime.onConnect(ids[2]!)
+    expect((runtime.snapshotFor(ids[1]!) as Snap).endsAt).toBe(original)
   })
 
   it('sends a host line', () => {
@@ -95,9 +128,8 @@ describe('phase advance', () => {
   it('sets no timer on the terminal phase', () => {
     runtime.start()
     vi.advanceTimersByTime(180_000 + 4 * 15_000)
-    const before = runtime.phase
-    vi.advanceTimersByTime(600_000)
-    expect(runtime.phase).toBe(before)
+    expect(runtime.phase).toBe('results')
+    expect(vi.getTimerCount()).toBe(0)
   })
 
   it('persists a result when it reaches results', () => {
@@ -152,6 +184,8 @@ describe('dispatch', () => {
     runtime.dispatch(ids[0]!, { type: 'SUBMIT', strokes, by: ids[1]! })
     const snap = runtime.snapshotFor(ids[1]!) as Extract<ServerMessage, { type: 'snapshot' }>
     expect((snap.view as { submitted: boolean }).submitted).toBe(false)
+    const actor = runtime.snapshotFor(ids[0]!) as Snap
+    expect((actor.view as { submitted: boolean }).submitted).toBe(true)
   })
 
   it('saves a DRAFT without broadcasting anything', () => {
@@ -194,5 +228,152 @@ describe('snapshotFor', () => {
     const late = store.addPlayer(room, { displayName: 'Late', token: newId() })
     const snap = runtime.snapshotFor(late.id) as Extract<ServerMessage, { type: 'snapshot' }>
     expect((snap.view as { kind: string }).kind).toBe('spectator')
+  })
+})
+
+describe('failure handling', () => {
+  it('logs a reducer that throws, with room, player and action type', () => {
+    const err = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const bad: GameModule<any, any, any> = { // eslint-disable-line @typescript-eslint/no-explicit-any
+      ...pumpkinModule,
+      reduce: () => { throw new Error('boom') },
+    }
+    const room = store.all()[0]!
+    const r = new RoomRuntime({ room, store, repo, module: bad, send: () => {} })
+    r.start()
+    expect(() => r.dispatch(ids[0]!, { type: 'SUBMIT', strokes })).not.toThrow()
+    const logged = err.mock.calls.flat().map(String).join(' ')
+    expect(logged).toContain(room.id)
+    expect(logged).toContain(ids[0]!)
+    expect(logged).toContain('SUBMIT')
+    r.dispose()
+    err.mockRestore()
+  })
+
+  it('does not advance when setPhase returns nothing', () => {
+    const err = vi.spyOn(console, 'error').mockImplementation(() => {})
+    runtime.start()
+    const room = store.all()[0]!
+    const bad: GameModule<any, any, any> = { // eslint-disable-line @typescript-eslint/no-explicit-any
+      ...pumpkinModule,
+      setPhase: () => undefined as never,
+    }
+    const r = new RoomRuntime({ room, store, repo, module: bad, send: () => {} })
+    ;(r as unknown as { started: boolean }).started = true
+    expect(() => r.advancePhase()).not.toThrow()
+    expect(room.phase).toBe('carving')
+    expect(room.state).not.toBeUndefined()
+    r.dispose()
+    err.mockRestore()
+  })
+
+  it('does not let a throwing timer callback escape', () => {
+    const err = vi.spyOn(console, 'error').mockImplementation(() => {})
+    runtime.start()
+    store.all()[0]!.id = newId() as never       // saveResult will throw
+    expect(() => vi.advanceTimersByTime(180_000 + 4 * 15_000)).not.toThrow()
+    expect(runtime.phase).toBe('results')
+    err.mockRestore()
+  })
+
+  it('one failing recipient does not starve the rest of the room', () => {
+    const err = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const got: PlayerId[] = []
+    const room = store.all()[0]!
+    const r = new RoomRuntime({
+      room, store, repo, module: pumpkinModule,
+      send: (to, m) => {
+        if (to === ids[0]) throw new Error('socket closed')
+        if (m.type === 'snapshot') got.push(to)
+      },
+    })
+    r.start()
+    expect(got).toContain(ids[1]!)
+    expect(got).toContain(ids[2]!)
+    r.dispose()
+    err.mockRestore()
+  })
+})
+
+describe('timer lifecycle', () => {
+  it('a module setTimer in onPhaseEnter does not cancel the phase timer', () => {
+    const fired = vi.fn()
+    const mod: GameModule<any, any, any> = { // eslint-disable-line @typescript-eslint/no-explicit-any
+      ...pumpkinModule,
+      onPhaseEnter(state, phase, ctx) {
+        if (phase === 'carving') ctx.setTimer(1_000, fired)
+      },
+    }
+    const room = store.all()[0]!
+    const r = new RoomRuntime({ room, store, repo, module: mod, send: () => {} })
+    r.start()
+    vi.advanceTimersByTime(1_000)
+    expect(fired).toHaveBeenCalledTimes(1)
+    vi.advanceTimersByTime(179_000)
+    expect(r.phase).toBe('vote-scariest')
+    r.dispose()
+  })
+
+  it('dispose clears the phase timer and any module timers', () => {
+    const mod: GameModule<any, any, any> = { // eslint-disable-line @typescript-eslint/no-explicit-any
+      ...pumpkinModule,
+      onPhaseEnter(state, phase, ctx) { ctx.setTimer(1_000, () => {}) },
+    }
+    const room = store.all()[0]!
+    const r = new RoomRuntime({ room, store, repo, module: mod, send: () => {} })
+    r.start()
+    r.dispose()
+    runtime.dispose()
+    expect(vi.getTimerCount()).toBe(0)
+  })
+
+  it('dispatch and advancePhase are no-ops after dispose', () => {
+    runtime.start()
+    runtime.dispose()
+    runtime.dispatch(ids[0]!, { type: 'SUBMIT', strokes })
+    runtime.advancePhase()
+    expect(runtime.phase).toBe('carving')
+    expect(vi.getTimerCount()).toBe(0)
+  })
+
+  it('advancePhase before start does nothing', () => {
+    runtime.advancePhase()
+    expect(runtime.phase).toBe('lobby')
+    expect(vi.getTimerCount()).toBe(0)
+  })
+})
+
+describe('everyone disconnected', () => {
+  it('stalls rather than racing through the phases', () => {
+    runtime.start()
+    for (const id of ids) runtime.onDisconnect(id)
+    expect(runtime.phase).toBe('carving')
+    expect(repo.listResults(repo.ensureDefaultWorkspace())).toHaveLength(0)
+  })
+
+  it('lets the phase clock decide once nobody is connected', () => {
+    runtime.start()
+    for (const id of ids) runtime.onDisconnect(id)
+    vi.advanceTimersByTime(180_000)
+    expect(runtime.phase).toBe('vote-scariest')
+  })
+})
+
+describe('start failure', () => {
+  it('can be retried after createState throws', () => {
+    let calls = 0
+    const mod: GameModule<any, any, any> = { // eslint-disable-line @typescript-eslint/no-explicit-any
+      ...pumpkinModule,
+      createState: (p, seed) => {
+        if (calls++ === 0) throw new Error('boom')
+        return pumpkinModule.createState(p, seed)
+      },
+    }
+    const room = store.all()[0]!
+    const r = new RoomRuntime({ room, store, repo, module: mod, send: () => {} })
+    expect(() => r.start()).toThrow(/boom/)
+    expect(() => r.start()).not.toThrow()
+    expect(r.phase).toBe('carving')
+    r.dispose()
   })
 })

@@ -145,3 +145,11 @@ describe('reduce DRAFT outside carving', () => {
     expect(s).toEqual(voting)
   })
 })
+
+describe('reduce unknown action', () => {
+  it('returns the state unchanged for an unrecognised action type', () => {
+    const s = base()
+    const out = reduce(s, { type: 'NONSENSE' } as never, asPlayerId('a'))
+    expect(out).toEqual(s)
+  })
+})

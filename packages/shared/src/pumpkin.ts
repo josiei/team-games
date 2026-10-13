@@ -135,6 +135,8 @@ export function reduce(
         },
       }
     }
+    default:
+      return state                                             // unrecognised action: ignore
   }
 }
 

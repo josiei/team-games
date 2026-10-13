@@ -9,8 +9,11 @@ export type ServerMessage =
       players: Player[]
       labels: Record<string, string>
       hostId: PlayerId | null
+      /** Absolute deadline of the current phase, or null if it has none. */
+      endsAt: number | null
+      /** Server clock at send time, so clients can correct for skew. */
+      serverNow: number
     }
-  | { type: 'timer'; endsAt: number; serverNow: number }
   | { type: 'host'; line: string }
   | { type: 'error'; code: string; message: string }
 
