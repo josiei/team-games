@@ -1,4 +1,6 @@
-import { collapseThresholdFor, type Stroke } from './carve.js'
+import {
+  COLLAPSE_BASE, carvedRatio, collapseThresholdFor, integrityState, type Stroke,
+} from './carve.js'
 import type { Player } from './game.js'
 import type { PlayerId } from './ids.js'
 
@@ -161,4 +163,84 @@ export function tally(state: PumpkinState): Record<AwardKey, AwardResult> {
     results[award] = best
   }
   return results
+}
+
+export type Integrity = 'solid' | 'sagging' | 'collapsed'
+
+/** Deliberately has no owner field. See the security tests. */
+export type GalleryEntry = { slot: number; strokes: Stroke[]; integrity: Integrity }
+
+export type PumpkinView =
+  | { kind: 'lobby'; playerCount: number }
+  | {
+      kind: 'carving'
+      myStrokes: Stroke[]
+      submitted: boolean
+      ratio: number
+      integrity: Integrity
+      submittedCount: number
+      totalPlayers: number
+    }
+  | {
+      kind: 'voting'
+      award: AwardKey
+      gallery: GalleryEntry[]
+      mySlot: number
+      myVote: number | null
+    }
+  | {
+      kind: 'results'
+      gallery: GalleryEntry[]
+      winners: Record<AwardKey, AwardResult>
+      carvers: Record<number, PlayerId>
+    }
+
+function gallery(state: PumpkinState): GalleryEntry[] {
+  return state.slots.map((owner, slot) => {
+    const pumpkin = state.pumpkins[owner]
+    const strokes = pumpkin?.strokes ?? []
+    return {
+      slot,
+      strokes,
+      integrity: integrityState(carvedRatio(strokes), pumpkin?.collapseAt ?? COLLAPSE_BASE),
+    }
+  })
+}
+
+export function viewFor(state: PumpkinState, viewer: PlayerId): PumpkinView {
+  const totalPlayers = state.slots.length
+
+  if (state.phase === 'lobby') {
+    return { kind: 'lobby', playerCount: totalPlayers }
+  }
+
+  if (state.phase === 'carving') {
+    const mine = state.pumpkins[viewer]
+    const strokes = mine?.strokes ?? []
+    const ratio = carvedRatio(strokes)
+    return {
+      kind: 'carving',
+      myStrokes: strokes,
+      submitted: mine?.submitted ?? false,
+      ratio,
+      integrity: integrityState(ratio, mine?.collapseAt ?? COLLAPSE_BASE),
+      submittedCount: Object.values(state.pumpkins).filter(p => p.submitted).length,
+      totalPlayers,
+    }
+  }
+
+  if (state.phase === 'results') {
+    const carvers: Record<number, PlayerId> = {}
+    state.slots.forEach((owner, slot) => { carvers[slot] = owner })
+    return { kind: 'results', gallery: gallery(state), winners: tally(state), carvers }
+  }
+
+  const award = AWARD_BY_PHASE[state.phase]!
+  return {
+    kind: 'voting',
+    award,
+    gallery: gallery(state),
+    mySlot: slotOf(state, viewer),
+    myVote: state.votes[award][viewer] ?? null,
+  }
 }

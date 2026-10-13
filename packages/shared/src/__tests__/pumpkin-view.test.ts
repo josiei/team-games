@@ -1,0 +1,136 @@
+import { describe, expect, it } from 'vitest'
+import { createState, reduce, setPhase, slotOf, viewFor } from '../pumpkin.js'
+import { asPlayerId } from '../ids.js'
+import type { Stroke } from '../carve.js'
+
+// Distinctive ids, so "does this id appear in the payload" is a real check.
+const IDS = ['PLAYER_ALPHA_0001', 'PLAYER_BRAVO_0002', 'PLAYER_CHARLIE_003'] as const
+const [A, B, C] = IDS.map(asPlayerId) as [
+  ReturnType<typeof asPlayerId>, ReturnType<typeof asPlayerId>, ReturnType<typeof asPlayerId>,
+]
+const players = IDS.map((id, i) =>
+  ({ id: asPlayerId(id), displayName: `p${i}`, connected: true, joinedAt: i + 1 }))
+
+const deep: Stroke[] = Array.from({ length: 40 }, (_, i) => ({
+  tool: 'cut' as const, size: 0.3,
+  points: [[(i % 8) / 8, Math.floor(i / 8) / 5]] as [number, number][],
+}))
+const shallow: Stroke[] = [{ tool: 'cut', size: 0.08, points: [[0.4, 0.4]] }]
+
+function carved() {
+  let s = setPhase(createState(players, 42), 'carving')
+  s = reduce(s, { type: 'SUBMIT', strokes: shallow }, A)
+  s = reduce(s, { type: 'SUBMIT', strokes: deep }, B)
+  s = reduce(s, { type: 'SUBMIT', strokes: shallow }, C)
+  return s
+}
+
+describe('viewFor during carving', () => {
+  it('returns only the viewers own strokes', () => {
+    const view = viewFor(carved(), A)
+    expect(view.kind).toBe('carving')
+    if (view.kind !== 'carving') throw new Error('wrong view')
+    expect(view.myStrokes).toEqual(shallow)
+  })
+
+  it('never includes another players strokes', () => {
+    const payload = JSON.stringify(viewFor(carved(), A))
+    // B carved 40 strokes; A carved 1. A's payload must not carry B's volume.
+    expect(payload.match(/"tool"/g) ?? []).toHaveLength(shallow.length)
+  })
+
+  it('reports progress as a count, not as identities', () => {
+    const view = viewFor(carved(), A)
+    if (view.kind !== 'carving') throw new Error('wrong view')
+    expect(view.submittedCount).toBe(3)
+    expect(view.totalPlayers).toBe(3)
+  })
+
+  it('reports the viewers own integrity state', () => {
+    const view = viewFor(carved(), B)
+    if (view.kind !== 'carving') throw new Error('wrong view')
+    expect(view.integrity).toBe('collapsed')
+    expect(view.ratio).toBeGreaterThan(0.5)
+  })
+})
+
+describe('viewFor during voting', () => {
+  const state = () => setPhase(carved(), 'vote-scariest')
+
+  it('transmits no player id for any viewer', () => {
+    for (const viewer of [A, B, C]) {
+      const payload = JSON.stringify(viewFor(state(), viewer))
+      for (const id of IDS) expect(payload).not.toContain(id)
+    }
+  })
+
+  it('exposes no owner-shaped key on gallery entries', () => {
+    const view = viewFor(state(), A)
+    if (view.kind !== 'voting') throw new Error('wrong view')
+    for (const entry of view.gallery) {
+      expect(Object.keys(entry).sort()).toEqual(['integrity', 'slot', 'strokes'])
+    }
+  })
+
+  it('shows every pumpkin in shuffled slot order', () => {
+    const view = viewFor(state(), A)
+    if (view.kind !== 'voting') throw new Error('wrong view')
+    expect(view.gallery.map(g => g.slot)).toEqual([0, 1, 2])
+  })
+
+  it('tells the viewer their own slot so they cannot self-vote', () => {
+    const s = state()
+    const view = viewFor(s, A)
+    if (view.kind !== 'voting') throw new Error('wrong view')
+    expect(view.mySlot).toBe(slotOf(s, A))
+  })
+
+  it('reports only the viewers own vote', () => {
+    let s = state()
+    s = reduce(s, { type: 'VOTE', award: 'scariest', slot: slotOf(s, B) }, A)
+    s = reduce(s, { type: 'VOTE', award: 'scariest', slot: slotOf(s, C) }, B)
+
+    const aView = viewFor(s, A)
+    const bView = viewFor(s, B)
+    if (aView.kind !== 'voting' || bView.kind !== 'voting') throw new Error('wrong view')
+    expect(aView.myVote).toBe(slotOf(s, B))
+    expect(bView.myVote).toBe(slotOf(s, C))
+  })
+
+  it('does not leak running vote counts mid-phase', () => {
+    let s = state()
+    s = reduce(s, { type: 'VOTE', award: 'scariest', slot: slotOf(s, B) }, A)
+    const payload = JSON.stringify(viewFor(s, C))
+    expect(payload).not.toContain('votes')
+  })
+})
+
+describe('viewFor at results', () => {
+  it('finally reveals which player carved each slot', () => {
+    const s = setPhase(carved(), 'results')
+    const view = viewFor(s, A)
+    if (view.kind !== 'results') throw new Error('wrong view')
+    expect(view.carvers[slotOf(s, B)]).toBe(B)
+  })
+
+  it('includes the winner per award', () => {
+    let s = setPhase(carved(), 'vote-scariest')
+    s = reduce(s, { type: 'VOTE', award: 'scariest', slot: slotOf(s, B) }, A)
+    const view = viewFor(setPhase(s, 'results'), A)
+    if (view.kind !== 'results') throw new Error('wrong view')
+    expect(view.winners.scariest).toEqual({ slot: slotOf(s, B), votes: 1 })
+    expect(view.winners.funniest).toBeNull()
+  })
+
+  it('is identical for every viewer, since nothing is secret any more', () => {
+    const s = setPhase(carved(), 'results')
+    expect(viewFor(s, A)).toEqual(viewFor(s, B))
+  })
+})
+
+describe('viewFor in the lobby', () => {
+  it('reports the player count and nothing else', () => {
+    const view = viewFor(createState(players, 42), A)
+    expect(view).toEqual({ kind: 'lobby', playerCount: 3 })
+  })
+})
