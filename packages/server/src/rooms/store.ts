@@ -39,6 +39,8 @@ export type LiveRoom = {
 export interface RoomStore {
   create(input: {
     workspaceId: WorkspaceId; code: RoomCode; gameId: string; config?: RoomConfig
+    /** Register the room under this id (e.g. the database row's id). */
+    id?: RoomId
   }): LiveRoom
   get(workspaceId: WorkspaceId, roomId: RoomId): LiveRoom | null
   byCode(code: RoomCode): LiveRoom | null
@@ -57,9 +59,11 @@ export class InMemoryRoomStore implements RoomStore {
 
   create(input: {
     workspaceId: WorkspaceId; code: RoomCode; gameId: string; config?: RoomConfig
+    /** Register the room under this id (e.g. the database row's id). */
+    id?: RoomId
   }): LiveRoom {
     const room: LiveRoom = {
-      id: asRoomId(newId()),
+      id: input.id ?? asRoomId(newId()),
       workspaceId: input.workspaceId,
       code: input.code,
       gameId: input.gameId,

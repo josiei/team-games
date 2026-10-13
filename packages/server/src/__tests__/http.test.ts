@@ -7,11 +7,13 @@ import { createDb } from '../db/client.js'
 
 let app: FastifyInstance
 let store: InMemoryRoomStore
+let repo: Repo
 
 beforeEach(async () => {
   store = new InMemoryRoomStore()
+  repo = new Repo(createDb(':memory:'))
   app = buildApp({
-    repo: new Repo(createDb(':memory:')),
+    repo,
     store,
     runtimes: new Map(),
   })
@@ -195,5 +197,59 @@ describe('POST /api/rooms/:code/join with playerToken (idempotent re-join)', () 
     expect(body.playerToken).not.toBe(inA.playerToken)
     expect(store.byCode(a.code as never)!.players.size).toBe(1)
     expect(store.byCode(b.code as never)!.players.size).toBe(1)
+  })
+})
+
+describe('id consistency between memory and database', () => {
+  it('registers the room in the store under the database row id', async () => {
+    const { code, roomId } = await createRoom()
+    const ws = repo.ensureDefaultWorkspace()
+    expect(repo.findActiveRoomByCode(code as never)!.id).toBe(roomId)
+    expect(store.get(ws, roomId as never)).not.toBeNull()
+    expect(store.get(ws, roomId as never)!.code).toBe(code)
+    store.remove(ws, roomId as never)
+    expect(store.get(ws, roomId as never)).toBeNull()
+    expect(store.byCode(code as never)).toBeNull()
+  })
+
+  it('gives the database player row the store player id', async () => {
+    const { code } = await createRoom()
+    const ws = repo.ensureDefaultWorkspace()
+    const p = (await join(code, 'Host')).json() as { playerId: string; playerToken: string }
+    const row = repo.findPlayerByToken(ws, p.playerToken)
+    expect(row!.id).toBe(p.playerId)
+  })
+
+  it('lets repo.setConnected with that id update the row', async () => {
+    const { code, roomId } = await createRoom()
+    const ws = repo.ensureDefaultWorkspace()
+    const p = (await join(code, 'Host')).json() as { playerId: string }
+    repo.setConnected(ws, p.playerId as never, false)
+    const row = repo.listPlayers(ws, roomId as never).find(r => r.id === p.playerId)
+    expect(row!.connected).toBe(false)
+  })
+})
+
+describe('robustness', () => {
+  it('returns 409 ALREADY_STARTED on a second start', async () => {
+    const { code } = await createRoom()
+    const host = (await join(code, 'Host')).json() as { playerToken: string }
+    await join(code, 'Other')
+    const start = () => app.inject({
+      method: 'POST', url: `/api/rooms/${code}/start`,
+      payload: { playerToken: host.playerToken },
+    })
+    expect((await start()).statusCode).toBe(200)
+    const again = await start()
+    expect(again.statusCode).toBe(409)
+    expect(again.json()).toMatchObject({ code: 'ALREADY_STARTED' })
+  })
+
+  it('returns 400 for a non-string displayName', async () => {
+    const { code } = await createRoom()
+    const res = await app.inject({
+      method: 'POST', url: `/api/rooms/${code}/join`, payload: { displayName: 42 },
+    })
+    expect(res.statusCode).toBe(400)
   })
 })

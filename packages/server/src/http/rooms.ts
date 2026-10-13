@@ -32,11 +32,7 @@ export function registerRoomRoutes(app: FastifyInstance, deps: AppDeps): void {
     const workspaceId = repo.ensureDefaultWorkspace()
     const code = generateCode(c => repo.isCodeTaken(c) || store.byCode(c) !== null)
     const row = repo.createRoom({ workspaceId, code, gameId: game.id })
-    const live = store.create({ workspaceId, code, gameId: game.id })
-    // The in-memory room and the db row MUST share one id. Repo.addPlayer and
-    // Repo.saveResult look the room up by id scoped to its workspace, so if the
-    // ids diverged every player join (and result save) would throw.
-    live.id = row.id
+    const live = store.create({ workspaceId, code, gameId: game.id, id: row.id })
 
     return { code, roomId: live.id }
   })
@@ -44,7 +40,7 @@ export function registerRoomRoutes(app: FastifyInstance, deps: AppDeps): void {
   app.post('/api/rooms/:code/join', async (request, reply) => {
     const code = normalizeCode((request.params as { code: string }).code)
     const { displayName: rawName, playerToken } =
-      (request.body ?? {}) as { displayName?: string; playerToken?: string }
+      (request.body ?? {}) as { displayName?: unknown; playerToken?: unknown }
 
     const live = store.byCode(code)
     if (!live) return reply.code(404).send({ code: 'ROOM_NOT_FOUND' })
@@ -59,7 +55,7 @@ export function registerRoomRoutes(app: FastifyInstance, deps: AppDeps): void {
       }
     }
 
-    const displayName = (rawName ?? '').trim()
+    const displayName = typeof rawName === 'string' ? rawName.trim() : ''
     if (displayName.length === 0) return reply.code(400).send({ code: 'NAME_REQUIRED' })
     if (displayName.length > MAX_DISPLAY_NAME) {
       return reply.code(400).send({ code: 'NAME_TOO_LONG' })
@@ -71,11 +67,16 @@ export function registerRoomRoutes(app: FastifyInstance, deps: AppDeps): void {
     }
 
     const token = newId()
+    const hostBefore = live.hostId
     const player = store.addPlayer(live, { displayName, token })
+    // Same id in both stores: runtime presence updates and a restart rebuild
+    // key everything by the store player id.
     repo.addPlayer({
-      workspaceId: live.workspaceId, roomId: live.id, displayName, token,
+      workspaceId: live.workspaceId, roomId: live.id, displayName, token, id: player.id,
     })
-    repo.setHost(live.workspaceId, live.id, live.hostId)
+    if (live.hostId !== hostBefore) {
+      repo.setHost(live.workspaceId, live.id, live.hostId)
+    }
 
     runtimes.get(live.id)?.onConnect(player.id)
 
@@ -107,7 +108,14 @@ export function registerRoomRoutes(app: FastifyInstance, deps: AppDeps): void {
       })
       runtimes.set(live.id, runtime)
     }
-    runtime.start()
+    try {
+      runtime.start()
+    } catch (err) {
+      if (err instanceof Error && err.message === 'Room already started') {
+        return reply.code(409).send({ code: 'ALREADY_STARTED' })
+      }
+      throw err
+    }
     return { ok: true }
   })
 }

@@ -99,10 +99,12 @@ export class Repo {
 
   addPlayer(input: {
     workspaceId: WorkspaceId; roomId: RoomId; displayName: string; token: string
+    /** Share the id of the live-room player so both stores agree on identity. */
+    id?: PlayerId
   }): PlayerRow {
     this.requireRoom(input.workspaceId, input.roomId)
     const row = {
-      id: newId(),
+      id: input.id ?? newId(),
       roomId: input.roomId,
       workspaceId: input.workspaceId,
       displayName: input.displayName,
