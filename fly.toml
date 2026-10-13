@@ -1,0 +1,27 @@
+app = "team-games"
+primary_region = "sjc"
+
+[build]
+
+[env]
+  PORT = "8080"
+  # Must sit inside the volume mounted below, or snapshots vanish on redeploy.
+  DATABASE_URL = "/data/team-games.sqlite"
+
+[[mounts]]
+  source = "team_games_data"
+  destination = "/data"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = "suspend"
+  auto_start_machines = true
+  # Deliberate; do not economize here. Live rooms are held in memory, so a
+  # machine that suspends mid-game drops them. Snapshot/restore recovers, but a
+  # stall during a reveal is not what you want on game night.
+  min_machines_running = 1
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"

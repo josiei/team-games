@@ -38,6 +38,9 @@ importers:
       fastify:
         specifier: 5.2.1
         version: 5.2.1
+      tsx:
+        specifier: 4.19.2
+        version: 4.19.2
       ws:
         specifier: 8.18.0
         version: 8.18.0
@@ -51,9 +54,6 @@ importers:
       drizzle-kit:
         specifier: 0.30.4
         version: 0.30.4
-      tsx:
-        specifier: 4.19.2
-        version: 4.19.2
 
   packages/shared: {}
 
