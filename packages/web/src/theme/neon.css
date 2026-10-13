@@ -493,12 +493,16 @@
 /* Side by side once there is room: the canvas is portrait, so on a laptop the
    width beside it is exactly where the meter and the tools belong — and it
    lets the pumpkin itself grow. */
-.carve-layout { display: grid; gap: 20px; }
+/* Capped while it is one column: the stage is 1000px wide for the two-column
+   case, and an 800px-wide rail parks the Size slider far from the canvas. */
+.carve-layout { display: grid; gap: 20px; max-width: 560px; margin: 0 auto; }
 
 .carve-rail { align-self: start; }
 
 @media (min-width: 880px) {
   .carve-layout {
+    max-width: none;
+    margin: 0;
     grid-template-columns: minmax(0, 1fr) 320px;
     align-items: start;
   }
@@ -528,8 +532,14 @@
 .game-status {
   margin: 10px 0 0;
   min-height: 1.2em;
+  /* Reserved in the narrow rail below, where the longest message is 3 lines
+     and growing into them would push the toolbar out from under the cursor. */
   font-weight: 600;
   color: var(--glow);
+}
+
+@media (min-width: 880px) {
+  .carve-rail .game-status { min-height: 3.6em; }
 }
 
 .panel {
@@ -551,7 +561,10 @@
      as the input and derive the width from the aspect ratio. Sizing the frame
      by `fit-content` instead makes the canvas's `max-width: 100%` circular, and
      Chrome resolves it well short of the cap. */
-  --carve-max-h: 58dvh;
+  /* `100dvh - 140px` is the page's own chrome around the frame: the stage
+     padding, the head row, the host line. Without it a short viewport (a
+     phone in landscape clears the width gate below) overflows. */
+  --carve-max-h: min(58dvh, calc(100dvh - 140px));
   width: min(100%, calc(var(--carve-max-h) * 512 / 640));
   margin: 0 auto 12px;
   display: flex;
@@ -575,7 +588,7 @@
    earlier override is simply ignored. Once the rail takes the tools out from
    under the canvas, the pumpkin can have the height back. */
 @media (min-width: 880px) {
-  .carve-frame { --carve-max-h: 74dvh; }
+  .carve-frame { --carve-max-h: min(74dvh, calc(100dvh - 140px)); }
 }
 
 .toolbar {
@@ -694,10 +707,19 @@
   position: fixed;
   top: 16px;
   left: 16px;
-  /* Over the stage, under the error banner. */
-  z-index: 6;
+  /* Above the error banner (10): the banner is sticky at the top of the page
+     and would otherwise bury the exit at the moment it is the only way out. */
+  z-index: 11;
 }
 
+/* The banner takes flow space and pushes the stage down, but a fixed pill does
+   not move with it — so step down past it. The z-index above still keeps the
+   pill clickable if the banner wraps to more lines than this clears. */
+.error-banner ~ * .results-exit { top: 68px; }
+
+/* Same specificity as `.btn-quiet:hover` / `:focus-visible` and later in the
+   file: anything those own (outline, background on hover) would be silently
+   overridden from here. Add such a property to the blocks below, not this one. */
 .results-exit .btn-quiet {
   padding: 9px 16px;
   font-family: var(--font-display);

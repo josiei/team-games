@@ -27,4 +27,16 @@ describe('ErrorBanner', () => {
     act(() => { useConnection.getState().applyMessage(snap('lobby')) })
     expect(screen.queryByRole('alert')).toBeNull()
   })
+
+  // The banner is sticky at the top of the page and takes flow space, so
+  // neon.css steps the fixed results exit down past it through this class
+  // (`.error-banner ~ * .results-exit`). Renaming it buries the exit.
+  it('carries the class the exit offset is keyed on', () => {
+    render(<ErrorBanner />)
+    act(() => {
+      useConnection.getState().applyMessage(
+        { type: 'error', code: 'PHASE_FAILED', message: 'nope' } as never)
+    })
+    expect(screen.getByRole('alert').className).toBe('error-banner')
+  })
 })

@@ -42,7 +42,7 @@ export function ErrorBanner() {
   const error = useConnection(s => s.error)
   if (!error) return null
   return (
-    <div role="alert" style={{
+    <div role="alert" className="error-banner" style={{
       position: 'sticky', top: 0, zIndex: 10, padding: '12px 16px', textAlign: 'center',
       fontWeight: 700, background: '#B3261E', color: '#fff',
     }}>
