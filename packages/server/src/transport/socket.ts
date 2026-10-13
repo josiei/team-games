@@ -9,8 +9,28 @@ const CLOSE_REPLACED = 4001
 const CLOSE_BAD_TOKEN = 4003
 const CLOSE_NO_ROOM = 4004
 
-export function attachSocketServer(app: FastifyInstance, deps: AppDeps) {
-  const wss = new WebSocketServer({ noServer: true })
+// Largest legitimate frame is a carve stroke list (~12 bytes per point as
+// JSON, so 256 KiB is ~20k points), far beyond a three-minute carve. Anything
+// larger is rejected at the protocol level instead of being buffered.
+export const MAX_PAYLOAD = 256 * 1024
+export const HEARTBEAT_MS = 30_000
+
+export function attachSocketServer(
+  app: FastifyInstance, deps: AppDeps, options: { heartbeatMs?: number } = {},
+) {
+  const wss = new WebSocketServer({ noServer: true, maxPayload: MAX_PAYLOAD })
+  const alive = new WeakMap<WebSocket, boolean>()
+
+  // A silent socket (carving sends nothing) gets dropped by idle proxies.
+  // Ping each socket; one that has not answered the previous ping is dead.
+  const heartbeat = setInterval(() => {
+    for (const client of wss.clients) {
+      if (alive.get(client) === false) { client.terminate(); continue }
+      alive.set(client, false)
+      try { client.ping() } catch { client.terminate() }
+    }
+  }, options.heartbeatMs ?? HEARTBEAT_MS)
+  heartbeat.unref()
   const live = new Map<PlayerId, WebSocket>()
 
   const sendTo = (playerId: PlayerId, message: ServerMessage) => {
@@ -36,9 +56,18 @@ export function attachSocketServer(app: FastifyInstance, deps: AppDeps) {
 
   app.server.on('upgrade', (request, socket, head) => {
     const url = new URL(request.url ?? '/', 'http://localhost')
-    if (url.pathname !== '/ws') return
+    if (url.pathname !== '/ws') { socket.destroy(); return }
 
     wss.handleUpgrade(request, socket, head, ws => {
+      alive.set(ws, true)
+      ws.on('pong', () => alive.set(ws, true))
+      // Without a listener, ws rethrows 'error' as an uncaught exception and a
+      // single bad frame would kill every game on the process.
+      ws.on('error', error => {
+        console.error(`[ws] socket error (room ${url.searchParams.get('room')}):`, error)
+        try { ws.close(1011, 'error') } catch { ws.terminate() }
+      })
+
       const roomId = asRoomId(url.searchParams.get('room') ?? '')
       const token = url.searchParams.get('token') ?? ''
 
@@ -81,7 +110,9 @@ export function attachSocketServer(app: FastifyInstance, deps: AppDeps) {
 
   return {
     sendTo,
+    liveCount: () => live.size,
     async close() {
+      clearInterval(heartbeat)
       for (const socket of live.values()) socket.terminate()
       live.clear()
       for (const client of wss.clients) client.terminate()

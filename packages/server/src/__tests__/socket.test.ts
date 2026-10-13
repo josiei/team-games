@@ -1,7 +1,7 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import WebSocket from 'ws'
 import { buildApp } from '../app.js'
-import { attachSocketServer } from '../transport/socket.js'
+import { attachSocketServer, HEARTBEAT_MS, MAX_PAYLOAD } from '../transport/socket.js'
 import { InMemoryRoomStore } from '../rooms/store.js'
 import { Repo } from '../db/repo.js'
 import { createDb } from '../db/client.js'
@@ -17,6 +17,8 @@ const inboxes = new Map<WebSocket, ServerMessage[]>()
 const waiters = new Map<WebSocket, (m: ServerMessage) => void>()
 
 beforeEach(async () => {
+  // Only the heartbeat interval is faked; I/O and setTimeout stay real.
+  vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] })
   store = new InMemoryRoomStore()
   // One repo and one runtimes map, shared by the routes and the transport.
   // Two Repo instances on separate in-memory databases would let the runtime
@@ -36,6 +38,7 @@ afterEach(async () => {
   waiters.clear()
   await transport.close()
   await app.close()
+  vi.useRealTimers()
 })
 
 async function seed() {
@@ -49,8 +52,8 @@ async function seed() {
   return joined.json() as { roomId: string; playerId: string; playerToken: string }
 }
 
-function connect(roomId: string, token: string): WebSocket {
-  const ws = new WebSocket(`ws://127.0.0.1:${port}/ws?room=${roomId}&token=${token}`)
+function connect(roomId: string, token: string, opts: { autoPong?: boolean } = {}): WebSocket {
+  const ws = new WebSocket(`ws://127.0.0.1:${port}/ws?room=${roomId}&token=${token}`, opts as WebSocket.ClientOptions)
   sockets.push(ws)
   // Buffer from the first frame: the server sends its snapshot during the
   // upgrade, which can land before a test attaches a listener after 'open'.
@@ -108,16 +111,15 @@ describe('duplicate tokens', () => {
     expect(await closed(first)).toBe(4001)
   })
 
-  it('does not create a second presence entry', async () => {
+  it('keeps exactly one live socket for the token', async () => {
     const { roomId, playerToken } = await seed()
     const first = connect(roomId, playerToken)
-    await new Promise(r => first.once('open', r))
+    await open(first)
+    expect(transport.liveCount()).toBe(1)
     const second = connect(roomId, playerToken)
-    await new Promise(r => second.once('open', r))
-    await nextMessage(second)
-
-    const room = store.byCode(store.all()[0]!.code)!
-    expect(room.players.size).toBe(1)
+    await open(second)
+    await closed(first)
+    expect(transport.liveCount()).toBe(1)
   })
 
   it('keeps the player connected after the older socket is replaced', async () => {
@@ -209,13 +211,80 @@ describe('presence and host handoff', () => {
     expect(room.hostId).toBe(second.playerId)
   })
 
-  it('does not let a message body choose who acts', async () => {
-    const { roomId, playerToken } = await seed()
-    const ws = connect(roomId, playerToken)
-    await open(ws)
-    await nextMessage(ws)
-    ws.send(JSON.stringify({ type: 'action', by: 'someone-else', payload: { type: 'NOPE' } }))
+  async function startedRoom() {
+    const a = await seed()
+    const b = await joinAs(a.roomId, 'Second')
+    const wsA = connect(a.roomId, a.playerToken)
+    const wsB = connect(a.roomId, b.playerToken)
+    await Promise.all([open(wsA), open(wsB)])
     await settle()
-    expect(ws.readyState).toBe(WebSocket.OPEN)
+    const room = store.all()[0]!
+    const res = await app.inject({
+      method: 'POST', url: `/api/rooms/${room.code}/start`,
+      payload: { playerToken: a.playerToken },
+    })
+    expect(res.statusCode).toBe(200)
+    return { a, b, wsA, wsB, room }
+  }
+  const strokes = [{ tool: 'cut', size: 0.1, points: [[0.5, 0.5]] }]
+  type Pumpkins = { pumpkins: Record<string, { submitted: boolean }> }
+
+  it('routes an action to dispatch as the socket\'s own player', async () => {
+    const { a, b, wsA, room } = await startedRoom()
+    wsA.send(JSON.stringify({ type: 'action', payload: { type: 'SUBMIT', strokes } }))
+    await settle()
+    const state = room.state as Pumpkins
+    expect(state.pumpkins[a.playerId]?.submitted).toBe(true)
+    expect(state.pumpkins[b.playerId]?.submitted).toBe(false)
+  })
+
+  it('ignores a body-supplied `by`: the submission lands on the socket\'s player', async () => {
+    const { a, b, wsA, room } = await startedRoom()
+    wsA.send(JSON.stringify({
+      type: 'action', by: b.playerId,
+      payload: { type: 'SUBMIT', strokes, by: b.playerId },
+    }))
+    await settle()
+    const state = room.state as Pumpkins
+    expect(state.pumpkins[a.playerId]?.submitted).toBe(true)
+    expect(state.pumpkins[b.playerId]?.submitted).toBe(false)
+  })
+})
+
+describe('socket errors', () => {
+  it('survives an oversized frame and leaves other players connected', async () => {
+    const a = await seed()
+    const b = await joinAs(a.roomId, 'Second')
+    const wsA = connect(a.roomId, a.playerToken)
+    const wsB = connect(a.roomId, b.playerToken)
+    await Promise.all([open(wsA), open(wsB)])
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    wsA.send('x'.repeat(MAX_PAYLOAD + 1))
+    expect(await closed(wsA)).toBe(1009)   // protocol-level rejection
+    await settle()
+
+    expect(wsB.readyState).toBe(WebSocket.OPEN)
+    expect(errors).toHaveBeenCalled()
+    errors.mockRestore()
+  })
+})
+
+describe('heartbeat', () => {
+  it('terminates a socket that misses its pong and keeps a responsive one', async () => {
+    const a = await seed()
+    const b = await joinAs(a.roomId, 'Second')
+    const silent = connect(a.roomId, a.playerToken, { autoPong: false })
+    const healthy = connect(a.roomId, b.playerToken)
+    await Promise.all([open(silent), open(healthy)])
+
+    await vi.advanceTimersByTimeAsync(HEARTBEAT_MS)   // ping both
+    await settle()
+    await vi.advanceTimersByTimeAsync(HEARTBEAT_MS)   // silent never answered
+    await settle()
+
+    expect(silent.readyState).toBe(WebSocket.CLOSED)
+    expect(healthy.readyState).toBe(WebSocket.OPEN)
+    expect(transport.liveCount()).toBe(1)
   })
 })

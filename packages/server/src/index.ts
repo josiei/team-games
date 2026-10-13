@@ -25,7 +25,10 @@ Object.assign(deps, { send: transport.sendTo })
 const webDist = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)), '../../web/dist')
 await app.register(fastifyStatic, { root: webDist, wildcard: false })
-app.setNotFoundHandler((_request, reply) => reply.sendFile('index.html'))
+app.setNotFoundHandler((request, reply) => {
+  if (request.url.startsWith('/api/')) return reply.code(404).send({ code: 'NOT_FOUND' })
+  return reply.sendFile('index.html')
+})
 
 await app.listen({ port: PORT, host: '0.0.0.0' })
 console.log(`team-games listening on :${PORT}`)
