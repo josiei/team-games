@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { InMemoryRoomStore } from '../rooms/store.js'
 import { asRoomCode, asWorkspaceId, newId } from '@tg/shared'
 
@@ -86,5 +86,97 @@ describe('players', () => {
     room.phase = 'carving'
     store.addPlayer(room, { displayName: 'Late', token: newId() })
     expect(store.participants(room).map(p => p.displayName)).toEqual(['A', 'B'])
+  })
+})
+
+describe('host preference', () => {
+  it('falls back to a connected spectator when no participant is connected', () => {
+    const room = make()
+    const host = store.addPlayer(room, { displayName: 'A', token: newId() })
+    room.phase = 'carving'
+    const spec = store.addPlayer(room, { displayName: 'S', token: newId() })
+    store.setConnected(room, host.id, false)
+    store.reassignHostIfNeeded(room)
+    expect(room.hostId).toBe(spec.id)
+  })
+
+  it('prefers a connected participant over an earlier-joined spectator', () => {
+    const room = make()
+    const host = store.addPlayer(room, { displayName: 'A', token: newId() })
+    room.phase = 'carving'
+    const spec = store.addPlayer(room, { displayName: 'S', token: newId() })
+    room.phase = 'lobby'
+    const part = store.addPlayer(room, { displayName: 'B', token: newId() })
+    part.spectator = false
+    expect(spec.joinedAt).toBeLessThan(part.joinedAt)
+    store.setConnected(room, host.id, false)
+    store.reassignHostIfNeeded(room)
+    expect(room.hostId).toBe(part.id)
+  })
+
+  it('does not hand a headless room to a spectator while a participant is connected', () => {
+    const room = make()
+    const host = store.addPlayer(room, { displayName: 'A', token: newId() })
+    const part = store.addPlayer(room, { displayName: 'B', token: newId() })
+    store.setConnected(room, host.id, false)
+    room.hostId = null
+    room.phase = 'carving'
+    store.addPlayer(room, { displayName: 'S', token: newId() })
+    expect(room.hostId).toBe(part.id)
+  })
+
+  it('lets a spectator take an empty host seat when nobody connected is a participant', () => {
+    const room = make()
+    const host = store.addPlayer(room, { displayName: 'A', token: newId() })
+    store.setConnected(room, host.id, false)
+    store.reassignHostIfNeeded(room)
+    expect(room.hostId).toBeNull()
+    room.phase = 'carving'
+    const spec = store.addPlayer(room, { displayName: 'S', token: newId() })
+    expect(room.hostId).toBe(spec.id)
+  })
+
+  it('leaves hostId null when nobody is connected', () => {
+    const room = make()
+    const a = store.addPlayer(room, { displayName: 'A', token: newId() })
+    room.phase = 'carving'
+    const s = store.addPlayer(room, { displayName: 'S', token: newId() })
+    store.setConnected(room, a.id, false)
+    store.setConnected(room, s.id, false)
+    store.reassignHostIfNeeded(room)
+    expect(room.hostId).toBeNull()
+  })
+})
+
+describe('joinedAt ordering key', () => {
+  beforeEach(() => { vi.useFakeTimers() })
+  afterEach(() => { vi.useRealTimers() })
+  const join = (room: ReturnType<typeof make>, n: string) =>
+    store.addPlayer(room, { displayName: n, token: newId() }).joinedAt
+
+  it('is strictly increasing under a frozen clock', () => {
+    vi.setSystemTime(1_000_000)
+    const room = make()
+    const times = ['A', 'B', 'C', 'D'].map(n => join(room, n))
+    for (let i = 1; i < times.length; i++) expect(times[i]!).toBeGreaterThan(times[i - 1]!)
+  })
+
+  it('stays strictly increasing when the clock goes backwards', () => {
+    vi.setSystemTime(2_000_000)
+    const room = make()
+    const first = join(room, 'A')
+    vi.setSystemTime(1_000_000)
+    const second = join(room, 'B')
+    const third = join(room, 'C')
+    expect(second).toBeGreaterThan(first)
+    expect(third).toBeGreaterThan(second)
+  })
+
+  it('is per room, not a shared global counter', () => {
+    vi.setSystemTime(1_000_000)
+    const r1 = make(WS_A, 'AB2CD3')
+    const r2 = make(WS_A, 'EF4GH5')
+    join(r1, 'A'); join(r1, 'B'); join(r1, 'C')
+    expect(join(r2, 'X')).toBe(1_000_000)
   })
 })

@@ -3,6 +3,8 @@ import {
   type Player, type PlayerId, type RoomCode, type RoomId, type WorkspaceId,
 } from '@tg/shared'
 
+// Note: Player.joinedAt is a monotonic ordering key, not a wall-clock
+// timestamp. Never display it or expire on it.
 export type RoomPlayer = Player & { token: string; spectator: boolean }
 
 export type RoomConfig = { phaseMs: Record<string, number> }
@@ -106,7 +108,7 @@ export class InMemoryRoomStore implements RoomStore {
       spectator: room.phase !== 'lobby',
     }
     room.players.set(player.id, player)
-    if (!room.hostId) room.hostId = player.id
+    if (!room.hostId) this.reassignHostIfNeeded(room)
     return player
   }
 
@@ -122,13 +124,18 @@ export class InMemoryRoomStore implements RoomStore {
       .sort((a, b) => a.joinedAt - b.joinedAt || a.id.localeCompare(b.id))
   }
 
-  /** A sleeping host must not stall the room. */
+  /**
+   * A sleeping host must not stall the room. Preference order: earliest-joined
+   * connected participant, then earliest-joined connected spectator (someone
+   * present must be able to act), then null.
+   */
   reassignHostIfNeeded(room: LiveRoom): void {
     const current = room.hostId ? room.players.get(room.hostId) : undefined
     if (current?.connected) return
-    const next = [...room.players.values()]
+    const connected = [...room.players.values()]
       .filter(p => p.connected)
-      .sort((a, b) => a.joinedAt - b.joinedAt || a.id.localeCompare(b.id))[0]
+      .sort((a, b) => a.joinedAt - b.joinedAt || a.id.localeCompare(b.id))
+    const next = connected.find(p => !p.spectator) ?? connected[0]
     room.hostId = next?.id ?? null
   }
 }
