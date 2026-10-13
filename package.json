@@ -10,12 +10,18 @@
     "dev": "concurrently -n server,web -c cyan,magenta \"pnpm -F @tg/server dev\" \"pnpm -F @tg/web dev\"",
     "test": "vitest run",
     "build": "pnpm -F @tg/web build && pnpm -F @tg/server build",
-    "typecheck": "tsc -b --noEmit packages/shared packages/server packages/web"
+    "typecheck": "tsc -b --noEmit packages/shared packages/server packages/web",
+    "e2e": "playwright test",
+    "playtest": "tsx e2e/load.ts"
   },
   "devDependencies": {
+    "@playwright/test": "1.50.1",
     "@types/node": "22.10.2",
+    "@types/ws": "8.5.14",
     "concurrently": "9.1.2",
+    "tsx": "4.19.2",
     "typescript": "5.7.3",
-    "vitest": "3.0.5"
+    "vitest": "3.0.5",
+    "ws": "8.18.0"
   }
 }
