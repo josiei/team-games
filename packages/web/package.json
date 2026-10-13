@@ -1,0 +1,24 @@
+{
+  "name": "@tg/web",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": { "dev": "vite", "build": "vite build", "preview": "vite preview" },
+  "dependencies": {
+    "@tg/shared": "workspace:*",
+    "@fontsource-variable/archivo": "5.1.1",
+    "@fontsource-variable/inter": "5.1.1",
+    "@fontsource/bungee": "5.1.1",
+    "react": "19.0.0",
+    "react-dom": "19.0.0",
+    "zustand": "5.0.3"
+  },
+  "devDependencies": {
+    "@testing-library/react": "16.2.0",
+    "@types/react": "19.0.8",
+    "@types/react-dom": "19.0.3",
+    "@vitejs/plugin-react": "4.3.4",
+    "jsdom": "26.0.0",
+    "vite": "7.0.0"
+  }
+}

@@ -1,0 +1,48 @@
+@import '@fontsource-variable/archivo/index.css';
+@import '@fontsource-variable/inter/index.css';
+@import '@fontsource/bungee/400.css';
+
+:root {
+  --shell-bg: #0E0D14;
+  --shell-surface: #1A1826;
+  --shell-border: #2E2B3F;
+  --shell-text: #F4F2F8;
+  --shell-muted: #9A95AD;
+
+  /* Overridden per game from GameModule.theme */
+  --accent: #FF7518;
+  --accent-2: #8B5CF6;
+  --glow: #FFC24D;
+  --danger: #84CC16;
+
+  --font-display: 'Archivo Variable', system-ui, sans-serif;
+  --font-ui: 'Inter Variable', system-ui, sans-serif;
+  --font-game: 'Bungee', var(--font-display);
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--shell-bg);
+  color: var(--shell-text);
+  font-family: var(--font-ui);
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3 { font-family: var(--font-display); font-weight: 800; letter-spacing: -0.02em; }
+
+.room-code {
+  font-family: var(--font-display);
+  font-weight: 900;
+  font-stretch: 125%;
+  font-size: clamp(2rem, 6vw, 4rem);
+  letter-spacing: 0.08em;
+  color: var(--accent);
+}
+
+.surface {
+  background: var(--shell-surface);
+  border: 1px solid var(--shell-border);
+  border-radius: 12px;
+}
