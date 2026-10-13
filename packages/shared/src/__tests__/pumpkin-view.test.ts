@@ -57,10 +57,38 @@ describe('viewFor during carving', () => {
 describe('viewFor during voting', () => {
   const state = () => setPhase(carved(), 'vote-scariest')
 
-  it('transmits no player id for any viewer', () => {
-    for (const viewer of [A, B, C]) {
-      const payload = JSON.stringify(viewFor(state(), viewer))
-      for (const id of IDS) expect(payload).not.toContain(id)
+  const VOTE_PHASES = [
+    ['vote-scariest', 'scariest'],
+    ['vote-funniest', 'funniest'],
+    ['vote-craft', 'craft'],
+    ['vote-cursed', 'cursed'],
+  ] as const
+
+  // Votes are keyed by voter id inside state, so they must actually exist
+  // for this check to be able to catch a leaked derivative of state.votes.
+  function withVotes(phase: (typeof VOTE_PHASES)[number][0], award: (typeof VOTE_PHASES)[number][1]) {
+    let s = setPhase(carved(), phase)
+    s = reduce(s, { type: 'VOTE', award, slot: slotOf(s, B) }, A)
+    s = reduce(s, { type: 'VOTE', award, slot: slotOf(s, C) }, B)
+    s = reduce(s, { type: 'VOTE', award, slot: slotOf(s, A) }, C)
+    expect(Object.keys(s.votes[award])).toHaveLength(3)
+    return s
+  }
+
+  it('transmits no player id for any viewer in any vote phase, with votes cast', () => {
+    for (const [phase, award] of VOTE_PHASES) {
+      const s = withVotes(phase, award)
+      for (const viewer of [A, B, C]) {
+        const payload = JSON.stringify(viewFor(s, viewer))
+        for (const id of IDS) expect(payload).not.toContain(id)
+      }
+    }
+  })
+
+  it('pins the exact top-level key set of the voting view', () => {
+    for (const [phase, award] of VOTE_PHASES) {
+      const view = viewFor(withVotes(phase, award), A)
+      expect(Object.keys(view).sort()).toEqual(['award', 'gallery', 'kind', 'mySlot', 'myVote'])
     }
   })
 
@@ -132,5 +160,17 @@ describe('viewFor in the lobby', () => {
   it('reports the player count and nothing else', () => {
     const view = viewFor(createState(players, 42), A)
     expect(view).toEqual({ kind: 'lobby', playerCount: 3 })
+  })
+})
+
+describe('viewFor with an unrecognised phase', () => {
+  it('does not throw and degrades to an inert lobby-shaped view', () => {
+    const s = setPhase(carved(), 'definitely-not-a-phase')
+    for (const viewer of [A, B, C]) {
+      expect(() => viewFor(s, viewer)).not.toThrow()
+      const payload = JSON.stringify(viewFor(s, viewer))
+      for (const id of IDS) expect(payload).not.toContain(id)
+    }
+    expect(viewFor(s, A)).toEqual({ kind: 'lobby', playerCount: 3 })
   })
 })

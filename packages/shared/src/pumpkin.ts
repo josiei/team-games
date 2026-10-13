@@ -235,7 +235,10 @@ export function viewFor(state: PumpkinState, viewer: PlayerId): PumpkinView {
     return { kind: 'results', gallery: gallery(state), winners: tally(state), carvers }
   }
 
-  const award = AWARD_BY_PHASE[state.phase]!
+  const award = AWARD_BY_PHASE[state.phase]
+  // Unrecognised phase (setPhase does not validate): degrade to an inert,
+  // identity-free view rather than throwing inside a broadcast loop.
+  if (!award) return { kind: 'lobby', playerCount: totalPlayers }
   return {
     kind: 'voting',
     award,
