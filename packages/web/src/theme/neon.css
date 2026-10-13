@@ -1,0 +1,239 @@
+/* The lobby's title screen: spiral backdrop, neon sign, and the join card.
+   Everything here is decorative chrome for the pre-game screen; the in-game
+   screens keep their own styling. */
+
+.lobby-stage {
+  position: relative;
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: 24px 16px;
+  overflow: hidden;
+}
+
+/* --- backdrop ------------------------------------------------------------ */
+
+.spiral {
+  position: absolute;
+  /* Exactly covers the stage. No oversizing is needed: the path is drawn out
+     to the viewBox corners, and `slice` scales the square viewBox to cover, so
+     the spiral still reaches every edge as it turns. (Percentage width resolves
+     against the stage, not against an inset box -- oversizing with `inset`
+     alone leaves a bare corner.) */
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0.8;
+  pointer-events: none;
+}
+
+.spiral-turn {
+  /* Rotate about the centre of the viewBox, which is where the spiral starts.
+     Without `transform-box`, an SVG group turns about its own bounding box --
+     and a spiral's bbox is nowhere near its origin, so the whole figure orbits
+     off the screen instead of spinning in place. */
+  transform-box: view-box;
+  transform-origin: 50% 50%;
+  animation: spiral-spin 90s linear infinite;
+}
+
+@keyframes spiral-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Falls the edges off into the page background so the spiral has no hard seam. */
+.lobby-stage::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(ellipse at center,
+    transparent 30%,
+    color-mix(in srgb, var(--shell-bg) 40%, transparent) 70%,
+    color-mix(in srgb, var(--shell-bg) 85%, transparent) 105%);
+}
+
+/* Everything real sits above the backdrop and its vignette. */
+.lobby-content {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 440px;
+  display: grid;
+  gap: 28px;
+  justify-items: center;
+}
+
+/* --- the sign ------------------------------------------------------------ */
+
+.neon-sign {
+  position: relative;
+  width: 100%;
+  padding: 26px 22px 30px;
+  text-align: center;
+  border-radius: 18px;
+  background: color-mix(in srgb, #000 72%, transparent);
+  border: 2px solid color-mix(in srgb, var(--glow) 55%, transparent);
+  box-shadow:
+    0 0 10px color-mix(in srgb, var(--neon-tube) 45%, transparent),
+    0 0 36px color-mix(in srgb, var(--neon-tube) 22%, transparent),
+    inset 0 0 18px color-mix(in srgb, var(--neon-tube) 18%, transparent);
+}
+
+/* The inner hairline that makes the frame read as a double-tube sign. */
+.neon-sign::before {
+  content: '';
+  position: absolute;
+  inset: 7px;
+  border-radius: 12px;
+  border: 1px solid color-mix(in srgb, var(--glow) 32%, transparent);
+  pointer-events: none;
+}
+
+.neon-word {
+  margin: 0;
+  font-family: var(--font-game);
+  font-weight: 400;
+  font-size: clamp(1.9rem, 8.5vw, 3.1rem);
+  letter-spacing: 0.06em;
+  line-height: 1.05;
+  color: #FFF4E8;
+  text-shadow:
+    0 0 2px #FFF,
+    0 0 9px var(--glow),
+    0 0 20px var(--neon-tube),
+    0 0 42px var(--neon-tube),
+    0 0 78px color-mix(in srgb, var(--neon-tube) 70%, transparent);
+}
+
+.neon-script {
+  margin: 10px 0 0;
+  font-family: var(--font-script);
+  font-size: clamp(1.25rem, 5vw, 1.75rem);
+  line-height: 1.2;
+  /* The script is one tube thinner than the wordmark, as on a real sign. */
+  color: #FFEAF4;
+  text-shadow:
+    0 0 2px #FFF,
+    0 0 10px var(--neon-script-ink),
+    0 0 26px var(--neon-script-ink),
+    0 0 52px color-mix(in srgb, var(--neon-script-ink) 60%, transparent);
+}
+
+/* A real tube does not blink on a tidy schedule: the off-beats are uneven and
+   brief, and the letter never goes fully dark. */
+.neon-flicker { animation: tube-flicker 7s infinite; }
+
+@keyframes tube-flicker {
+  0%, 41%, 43.5%, 45%, 47.5%, 62%, 64%, 100% { opacity: 1; }
+  42%, 44.2%, 46%, 63% { opacity: 0.35; text-shadow: 0 0 4px var(--glow); }
+}
+
+/* --- the join card ------------------------------------------------------- */
+
+.join-card {
+  width: 100%;
+  padding: 22px 20px 24px;
+  display: grid;
+  gap: 6px;
+  background: color-mix(in srgb, var(--shell-surface) 88%, transparent);
+  border: 1px solid var(--shell-border);
+  border-radius: 14px;
+  backdrop-filter: blur(6px);
+}
+
+.join-card label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--shell-muted);
+}
+
+.join-card label + input { margin-bottom: 14px; }
+
+.join-card input {
+  width: 100%;
+  padding: 12px 14px;
+  font: inherit;
+  font-size: 1rem;
+  color: var(--shell-text);
+  background: color-mix(in srgb, #000 35%, var(--shell-bg));
+  border: 1px solid var(--shell-border);
+  border-radius: 10px;
+  outline: none;
+  transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+
+.join-card input:focus-visible {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 28%, transparent);
+}
+
+.join-card input.code-field {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 1.5rem;
+  letter-spacing: 0.22em;
+  text-align: center;
+}
+
+.join-actions { display: grid; gap: 10px; margin-top: 4px; }
+
+.btn-neon,
+.btn-ghost {
+  padding: 13px 18px;
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 1rem;
+  letter-spacing: 0.04em;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: transform 100ms ease, box-shadow 140ms ease, background-color 140ms ease;
+}
+
+.btn-neon {
+  color: #1A0E04;
+  background: var(--accent);
+  border: 1px solid color-mix(in srgb, var(--glow) 70%, transparent);
+  box-shadow: 0 0 14px color-mix(in srgb, var(--accent) 50%, transparent);
+}
+
+.btn-neon:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 0 22px color-mix(in srgb, var(--accent) 70%, transparent);
+}
+
+.btn-ghost {
+  color: var(--shell-text);
+  background: transparent;
+  border: 1px solid var(--shell-border);
+}
+
+.btn-ghost:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--accent) 60%, transparent);
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+}
+
+.btn-neon:disabled,
+.btn-ghost:disabled { opacity: 0.45; cursor: not-allowed; box-shadow: none; }
+
+.btn-neon:focus-visible,
+.btn-ghost:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--glow) 75%, transparent);
+  outline-offset: 2px;
+}
+
+.join-error {
+  margin: 12px 0 0;
+  color: var(--accent);
+  font-size: 0.9rem;
+}
+
+/* --- motion -------------------------------------------------------------- */
+
+@media (prefers-reduced-motion: reduce) {
+  .spiral-turn { animation: none; }
+  .neon-flicker { animation: none; }
+  .btn-neon, .btn-ghost { transition: none; }
+}

@@ -3,12 +3,17 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "scripts": { "dev": "vite", "build": "vite build", "preview": "vite preview" },
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
   "dependencies": {
-    "@tg/shared": "workspace:*",
     "@fontsource-variable/archivo": "5.1.1",
     "@fontsource-variable/inter": "5.1.1",
     "@fontsource/bungee": "5.1.1",
+    "@fontsource/kaushan-script": "5.1.1",
+    "@tg/shared": "workspace:*",
     "react": "19.0.0",
     "react-dom": "19.0.0",
     "zustand": "5.0.3"

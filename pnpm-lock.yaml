@@ -80,6 +80,9 @@ importers:
       '@fontsource/bungee':
         specifier: 5.1.1
         version: 5.1.1
+      '@fontsource/kaushan-script':
+        specifier: 5.1.1
+        version: 5.1.1
       '@tg/shared':
         specifier: workspace:*
         version: link:../shared
@@ -851,6 +854,9 @@ packages:
 
   '@fontsource/bungee@5.1.1':
     resolution: {integrity: sha512-hu2fNysIPqVHExt29rIzt8NVbUn6pDsoOPhtRNgC0ofPtcue4pLhqEz/cBgUHVK9XcfpyuN+xpjqUSVFmJHOWg==}
+
+  '@fontsource/kaushan-script@5.1.1':
+    resolution: {integrity: sha512-LXU9Py+y9lS9dtgPc/XKiFlSx/IQF9WHTkGZQq6ZP7GuGYkvJ80+Up8/4mLc3Ms3z4Ir61mBmCh7J70iWlz0FA==}
 
   '@isaacs/cliui@9.0.0':
     resolution: {integrity: sha512-AokJm4tuBHillT+FpMtxQ60n8ObyXBatq7jD2/JA9dxbDDokKQm8KMht5ibGzLVU9IJDIKK4TPKgMHEYMn3lMg==}
@@ -2698,6 +2704,8 @@ snapshots:
   '@fontsource-variable/inter@5.1.1': {}
 
   '@fontsource/bungee@5.1.1': {}
+
+  '@fontsource/kaushan-script@5.1.1': {}
 
   '@isaacs/cliui@9.0.0': {}
 

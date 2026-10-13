@@ -1,6 +1,7 @@
 @import '@fontsource-variable/archivo/index.css';
 @import '@fontsource-variable/inter/index.css';
 @import '@fontsource/bungee/400.css';
+@import '@fontsource/kaushan-script/400.css';
 
 :root {
   --shell-bg: #0E0D14;
@@ -8,6 +9,12 @@
   --shell-border: #2E2B3F;
   --shell-text: #F4F2F8;
   --shell-muted: #9A95AD;
+
+  /* Lobby sign and backdrop. Shell-level: the home screen is pre-game, so these
+     stay fixed while --accent and friends change per game. */
+  --spiral-ink: #402E73;
+  --neon-tube: #FF7518;
+  --neon-script-ink: #FF4FA3;
 
   /* Overridden per game from GameModule.theme */
   --accent: #FF7518;
@@ -19,6 +26,7 @@
   --font-display: 'Archivo Variable', system-ui, sans-serif;
   --font-ui: 'Inter Variable', system-ui, sans-serif;
   --font-game: 'Bungee', var(--font-display);
+  --font-script: 'Kaushan Script', 'Snell Roundhand', cursive;
 }
 
 * { box-sizing: border-box; }
