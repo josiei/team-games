@@ -23,7 +23,9 @@ export function ResultsScreen() {
   // Jocelyn must be told apart exactly when their work is attributed.
   const nameFor = (slot: number): string => {
     const carver = view.carvers[slot]
-    return (carver !== undefined ? labels[carver] : undefined) ?? UNKNOWN_CARVER
+    const label = carver !== undefined ? labels[carver] : undefined
+    // A blank label is as unreadable as a missing one.
+    return label && label.trim() !== '' ? label : UNKNOWN_CARVER
   }
 
   return (
@@ -47,9 +49,17 @@ export function ResultsScreen() {
               <h3 id={headingId} style={{ margin: '0 0 8px', fontSize: 16 }}>
                 {AWARD_LABELS[award]}
               </h3>
-              {winner && entry ? (
+              {winner ? (
                 <>
-                  <PumpkinThumb entry={entry} caption={nameFor(winner.slot)} />
+                  {entry ? (
+                    <PumpkinThumb entry={entry} caption={nameFor(winner.slot)} />
+                  ) : (
+                    // The award WAS decided; only its pumpkin is missing from
+                    // the gallery. Never claim there were no votes.
+                    <p style={{ margin: 0 }}>
+                      Pumpkin unavailable ({nameFor(winner.slot)})
+                    </p>
+                  )}
                   <p style={{ margin: '8px 0 0', color: 'var(--shell-muted)' }}>
                     {winner.votes} {winner.votes === 1 ? 'vote' : 'votes'}
                   </p>

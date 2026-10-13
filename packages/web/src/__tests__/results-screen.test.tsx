@@ -71,6 +71,12 @@ describe('ResultsScreen', () => {
     expect(gallery().queryAllByRole('button')).toHaveLength(0)
     expect(thumbs.every(b => b.getAttribute('aria-pressed') === null)).toBe(true)
     expect(thumbs.every(b => b.style.opacity === '1')).toBe(true)
+    // The winner cards' thumbs are display-only too.
+    const cardThumbs = [/scariest/i, /craftsmanship/i].flatMap(n => card(n).getAllByRole('img'))
+    expect(cardThumbs).toHaveLength(2)
+    expect(cardThumbs.every(b => b.getAttribute('aria-pressed') === null)).toBe(true)
+    expect(cardThumbs.every(b => b.style.opacity === '1')).toBe(true)
+    expect(screen.queryAllByRole('button')).toHaveLength(0)
   })
 
   it('does not crash when a winning slot has no carver recorded', () => {
@@ -92,5 +98,22 @@ describe('ResultsScreen', () => {
       expect(screen.getByRole('heading', { name })).toBeTruthy()
     }
     expect(screen.getAllByText(/no votes cast/i).length).toBe(4)
+    // The gallery must survive an all-undecided room.
+    expect(gallery().getAllByRole('img', { name: /pumpkin/i })).toHaveLength(2)
+  })
+
+  it('does not claim "No votes cast" for a winner whose pumpkin is missing from the gallery', () => {
+    setView({ gallery: [entry(1)] }) // scariest won slot 0 with 2 votes; slot 0 is absent
+    render(<ResultsScreen />)
+    const scariest = card(/scariest/i)
+    expect(scariest.getByText(/2 votes/i)).toBeTruthy()
+    expect(scariest.queryByText(/no votes cast/i)).toBeNull()
+    expect(scariest.getByText(/pumpkin unavailable/i).textContent).toContain('Jocelyn')
+  })
+
+  it('treats a blank label as missing', () => {
+    useConnection.setState({ labels: { me: '  ', other: 'Jocelyn (2)' } })
+    render(<ResultsScreen />)
+    expect(card(/scariest/i).getByText(/unknown carver/i)).toBeTruthy()
   })
 })
