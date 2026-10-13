@@ -3,7 +3,7 @@
 A web portal of live, multiplayer team-building games. Teammates join a room
 with a shared code and play together from their own laptops.
 
-**Status:** design approved, implementation not started.
+**Status:** implementation nearly complete; the Fly deployment files exist but nothing has been deployed yet.
 
 ## First slice
 
@@ -34,7 +34,8 @@ pnpm e2e        # Playwright specs (script lands with the e2e task)
 pnpm playtest 12 [url]   # load script: N simulated players (script lands with the playtest task)
 ```
 
-Deployed at <https://team-games.fly.dev> (Fly.io, region `sjc`).
+Not deployed yet. Once someone runs the steps below, the target URL is
+`https://team-games.fly.dev` (it changes if the app name changes).
 
 ### Deploying
 
@@ -43,10 +44,24 @@ source-only), and serves the built web client. Room snapshots live in SQLite on
 a Fly volume mounted at `/data` (`DATABASE_URL=/data/team-games.sqlite`).
 
 ```bash
-fly launch --no-deploy --name team-games --region sjc
+fly apps create team-games
 fly volumes create team_games_data --region sjc --size 1
-fly deploy
+fly deploy --ha=false
 ```
 
-`min_machines_running = 1` is deliberate: rooms live in memory, so a machine
-that suspends mid-game drops them.
+> **WARNING: run exactly ONE machine.** Always deploy with `--ha=false`.
+> Rooms live in memory, so a second machine splits the party: the same room code
+> would resolve to two different rooms, and the volume only attaches to one
+> machine. `fly.toml` cannot express a maximum machine count, so nothing in the
+> config prevents this; check `fly status` shows one machine and never run
+> `fly scale count` above 1.
+
+Do not use `fly launch`: with an existing `fly.toml` it prompts and may rewrite
+the file, dropping comments and the `[[mounts]]` block.
+
+The app name `team-games` is globally unique on Fly and may be taken. If
+`fly apps create` rejects it, pick another name, set `app` in `fly.toml` to
+match, and note the URL becomes `https://<name>.fly.dev`.
+
+`min_machines_running = 1` and `auto_stop_machines = "off"` are deliberate:
+rooms live in memory, so a machine that stops or suspends mid-game drops them.

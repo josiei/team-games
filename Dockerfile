@@ -18,6 +18,8 @@ RUN pnpm -F @tg/web build
 
 FROM base AS runtime
 ENV NODE_ENV=production
+# No TTY at build time: stops pnpm aborting if it wants to recreate node_modules.
+ENV CI=true
 COPY --from=build /app /app
 # Drop dev dependencies. The server runs from source under tsx (@tg/shared is
 # source-only), so tsx stays as a production dependency.
