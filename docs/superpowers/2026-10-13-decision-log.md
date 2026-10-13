@@ -610,3 +610,46 @@ and vote path are never exercised, and every phase burns its full 15s).
 - Ruling: park — the error banner has no dismiss for non-terminal errors (e.g. NO_RUNTIME), so it lingers until the phase changes. Cost if wrong: a stale banner, no loss.
 
 - Ruling: park — the I3 effect key ignores stroke contents. Sound today because the gallery is frozen while the vote screen is mounted. Cost if wrong: a stale thumbnail if a future game mutates a gallery entry in place.
+
+## Verification evidence
+
+Recorded here because the execution ledger and the per-task reports are
+scratch space and get deleted at handoff.
+
+**Acceptance, run by the controller (not taken on an agent's report):**
+- 366 unit tests across 28 files.
+- 2 Playwright tests against real Chromium, 1.1 minutes, driving a complete
+  round: create, join by code, carve on canvas, submit, four voting phases,
+  results.
+- `packages/shared`, `packages/server`, `packages/web` each typecheck clean.
+- `pnpm -F @tg/web build` succeeds, emitting the Archivo/Inter woff2 files
+  locally (so the no-runtime-Google-Fonts constraint holds).
+- The server boots on the DEFAULT `DATABASE_URL`, creates its db plus WAL
+  files, serves `/api/games`, and a second boot on the same file serves 200.
+
+**Restart survival, demonstrated against a file-backed SQLite** (by the
+fix-wave agent; the controller independently reproduced the boot and
+second-boot halves): a room was created, two players named "Sam" joined, the
+game started, one pumpkin was submitted, the server was `kill -9`'d and
+restarted on the same file. It logged `restored 1 room(s) from snapshot`; the
+player reconnected with their original token and found their strokes in the
+restored gallery; both `joined_at` values were distinct and ordered. A legacy
+`room_snapshot` lacking the `participants` and `ends_at` columns was
+hand-built and booted twice: both columns were added on boot 1, with no error
+on boot 2.
+
+**The one gap, stated precisely.** The mid-carve resume path has 6 unit tests
+plus 3 real-socket integration tests in `restore-resume.test.ts`, against an
+in-memory database. Restart survival against a file-backed database was
+demonstrated at a post-carving phase. The COMBINATION — killed mid-carving,
+on disk, with the saved DRAFT, the `ends_at` column and the re-armed phase
+timer all surviving together — was never demonstrated. Both halves are
+verified; they were not verified together. The controller attempted this
+three times and failed each time on environment or script problems of its own
+making (module resolution, a self-inflicted port collision, then a
+snapshot-listener race in the throwaway script), never on the feature. It is
+a ~2-minute manual check and is the top remaining item before game night.
+
+**Never exercised at all:** the Docker image. Docker is not installed on the
+machine this was built on, so the Dockerfile has been read and reasoned about
+but never built. Treat the first `fly deploy` as the first real test of it.
