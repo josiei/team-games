@@ -34,3 +34,26 @@ describe('normalizeCode', () => {
     expect(normalizeCode(' ab2-cd3 ')).toBe(asRoomCode('AB2CD3'))
   })
 })
+
+describe('generateCode distribution', () => {
+  it('draws every alphabet character with equal probability (no modulo bias)', () => {
+    // 20,000 codes = 120,000 characters over 30 symbols: expected 4,000 each.
+    // Chi-square with 29 df; 58.3 is the 99.9th percentile. A modulo-biased
+    // draw (indices 0-15 at 9/256 vs 8/256) scores ~400 here and fails.
+    const counts = new Map<string, number>()
+    for (let i = 0; i < 20_000; i++) {
+      for (const c of generateCode(() => false)) {
+        counts.set(c, (counts.get(c) ?? 0) + 1)
+      }
+    }
+    const total = 20_000 * 6
+    const expected = total / CODE_ALPHABET.length
+    let chi2 = 0
+    for (const c of CODE_ALPHABET) {
+      const observed = counts.get(c) ?? 0
+      chi2 += (observed - expected) ** 2 / expected
+    }
+    expect(counts.size).toBe(CODE_ALPHABET.length)
+    expect(chi2).toBeLessThan(58.3)
+  })
+})

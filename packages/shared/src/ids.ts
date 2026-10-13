@@ -1,5 +1,3 @@
-import { randomBytes } from 'node:crypto'
-
 declare const brand: unique symbol
 export type Brand<K, T> = K & { readonly [brand]: T }
 
@@ -17,7 +15,8 @@ const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789
 
 /** 21-char url-safe id. 126 bits of entropy — collision-free at our scale. */
 export function newId(): string {
-  const bytes = randomBytes(21)
+  const bytes = new Uint8Array(21)
+  globalThis.crypto.getRandomValues(bytes)
   let out = ''
   for (let i = 0; i < 21; i++) out += ALPHABET[bytes[i]! & 63]
   return out
