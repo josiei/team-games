@@ -5,6 +5,11 @@ import {
 import type { Repo } from '../db/repo.js'
 import type { LiveRoom, RoomStore } from './store.js'
 
+/** Client-controlled text must not forge log lines or flood the log. */
+function logSafe(text: string): string {
+  return text.replace(/[\r\n]+/g, ' ').slice(0, 32)
+}
+
 type Send = (to: PlayerId, message: ServerMessage) => void
 
 export class RoomRuntime {
@@ -21,6 +26,7 @@ export class RoomRuntime {
   private phaseEndsAt: number | null = null
   private started = false
   private disposed = false
+  private failed = false
 
   constructor(deps: {
     room: LiveRoom
@@ -40,19 +46,36 @@ export class RoomRuntime {
   get phase(): string { return this.room.phase }
 
   start(): void {
+    if (this.disposed) throw new Error('Room disposed')
     if (this.started) throw new Error('Room already started')
 
-    // Participants, never room.players: spectators who joined after the game
-    // started must not receive a pumpkin or a gallery slot.
-    const participants = this.store.participants(this.room)
-    // Build state before flipping `started`, so a throw here leaves the
-    // runtime retryable instead of wedged on "already started".
-    const state = this.module.createState(participants, this.room.seed)
-    if (state === undefined || state === null) throw new Error('createState returned no state')
-    this.room.state = state
-    this.started = true
-    this.repo.setRoomStatus(this.room.workspaceId, this.room.id, 'playing')
-    this.enterPhase(this.module.phases[1]!)      // phases[0] is 'lobby'
+    // Any failure inside start() rolls the runtime back to its pre-start
+    // condition and rethrows, so the caller can report it and the host can
+    // press start again.
+    try {
+      // Participants, never room.players: spectators who joined after the game
+      // started must not receive a pumpkin or a gallery slot.
+      const participants = this.store.participants(this.room)
+      const state = this.module.createState(participants, this.room.seed)
+      if (state === undefined || state === null) throw new Error('createState returned no state')
+      this.room.state = state
+      this.started = true
+      this.repo.setRoomStatus(this.room.workspaceId, this.room.id, 'playing')
+      if (!this.enterPhase(this.module.phases[1]!)) {     // phases[0] is 'lobby'
+        throw new Error('could not enter the first phase')
+      }
+    } catch (error) {
+      this.started = false
+      this.clearPhaseTimer()
+      this.clearModuleTimers()
+      this.phaseEndsAt = null
+      this.room.state = null
+      this.room.phase = this.module.phases[0]!
+      try {
+        this.repo.setRoomStatus(this.room.workspaceId, this.room.id, 'open')
+      } catch { /* best effort */ }
+      throw error
+    }
   }
 
   dispatch(by: PlayerId, action: unknown): void {
@@ -70,7 +93,7 @@ export class RoomRuntime {
       // An unknown action type is ignored quietly; a throw is a bug or a
       // malformed payload and must be visible.
       console.error(
-        `[room ${this.room.id}] reduce threw for player ${by}, action ${action.type}:`, error)
+        `[room ${this.room.id}] reduce threw for player ${by}, action ${logSafe(action.type)}:`, error)
       return
     }
     if (next === undefined || next === null) return
@@ -88,11 +111,43 @@ export class RoomRuntime {
   }
 
   advancePhase(): void {
-    if (this.disposed || !this.started) return
+    this.tryAdvance()
+  }
+
+  /** True when the room advanced or is already terminal; false if entering the next phase failed. */
+  private tryAdvance(): boolean {
+    if (this.disposed || !this.started) return true
     const index = this.module.phases.indexOf(this.room.phase)
     const next = this.module.phases[index + 1]
-    if (!next) return
-    this.enterPhase(next)
+    if (!next) return true
+    return this.enterPhase(next)
+  }
+
+  /**
+   * The phase clock fired and the next phase could not be entered. Nobody can
+   * retry on a player's behalf, so end the game visibly instead of leaving a
+   * dead countdown.
+   */
+  private failRoom(reason: string): void {
+    if (this.disposed) return
+    console.error(`[room ${this.room.id}] ${reason}; ending the game`)
+    this.clearPhaseTimer()
+    this.clearModuleTimers()
+    this.phaseEndsAt = null
+    const terminal = this.module.phases[this.module.phases.length - 1]!
+    this.room.phase = terminal
+    try {
+      const next = this.module.setPhase(this.room.state, terminal)
+      if (next === undefined || next === null) throw new Error('no state')
+      this.room.state = next
+    } catch {
+      this.failed = true      // state still says the old phase; do not render it
+    }
+    this.broadcast({
+      type: 'error', code: 'PHASE_FAILED',
+      message: 'The game hit a problem and had to end.',
+    })
+    this.broadcastSnapshot()
   }
 
   onConnect(playerId: PlayerId): void {
@@ -122,7 +177,7 @@ export class RoomRuntime {
       phase: this.room.phase,
       // Always through viewFor for the current phase, never raw state: the
       // results view carries carver ids that earlier views must not.
-      view: this.room.state === null
+      view: this.room.state === null || this.failed
         ? { kind: 'lobby', playerCount: players.length }
         : this.module.viewFor(this.room.state, playerId),
       players,
@@ -140,7 +195,8 @@ export class RoomRuntime {
     this.clearModuleTimers()
   }
 
-  private enterPhase(phase: string): void {
+  /** Returns false (having changed nothing) if the phase could not be entered. */
+  private enterPhase(phase: string): boolean {
     // Validate before committing anything, so a bad setPhase cannot leave the
     // room half-transitioned with state that viewFor would choke on.
     let nextState: unknown
@@ -148,11 +204,11 @@ export class RoomRuntime {
       nextState = this.module.setPhase(this.room.state, phase)
     } catch (error) {
       console.error(`[room ${this.room.id}] setPhase threw entering ${phase}:`, error)
-      return
+      return false
     }
     if (nextState === undefined || nextState === null) {
       console.error(`[room ${this.room.id}] setPhase returned no state entering ${phase}`)
-      return
+      return false
     }
 
     this.clearPhaseTimer()
@@ -168,7 +224,11 @@ export class RoomRuntime {
       this.phaseEndsAt = Date.now() + ms
       this.phaseTimer = setTimeout(() => {
         this.phaseTimer = null
-        this.guarded(`advancing past ${phase}`, () => this.advancePhase())
+        let ok = false
+        try { ok = this.tryAdvance() } catch (error) {
+          console.error(`[room ${this.room.id}] error advancing past ${phase}:`, error)
+        }
+        if (!ok) this.failRoom(`could not advance past ${phase}`)
       }, ms)
     } else {
       this.phaseEndsAt = null
@@ -180,6 +240,7 @@ export class RoomRuntime {
     this.guarded(`onPhaseEnter(${phase})`,
       () => this.module.onPhaseEnter(this.room.state, phase, this.context()))
     // (saveSnapshot will be called here once persistence lands.)
+    return true
   }
 
   private guarded(what: string, fn: () => void): void {
@@ -204,6 +265,7 @@ export class RoomRuntime {
     return {
       broadcast: message => this.broadcast(message),
       setTimer: (ms, fn) => {
+        if (this.disposed) return
         const handle = setTimeout(() => {
           this.moduleTimers.delete(handle)
           this.guarded('module timer', fn)

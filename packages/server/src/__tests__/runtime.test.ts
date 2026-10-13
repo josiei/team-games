@@ -377,3 +377,111 @@ describe('start failure', () => {
     r.dispose()
   })
 })
+
+describe('phase failure', () => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const failingOn = (bad: (phase: string) => boolean): GameModule<any, any, any> => ({
+    ...pumpkinModule,
+    setPhase: (state, phase) => {
+      if (bad(phase)) throw new Error('boom')
+      return pumpkinModule.setPhase(state, phase)
+    },
+  })
+
+  it('start() throws when the first phase fails, and can be retried', () => {
+    const err = vi.spyOn(console, 'error').mockImplementation(() => {})
+    let fail = true
+    const room = store.all()[0]!
+    const r = new RoomRuntime({
+      room, store, repo, send: () => {},
+      module: failingOn(() => { const f = fail; fail = false; return f }),
+    })
+    expect(() => r.start()).toThrow()
+    expect(room.phase).toBe('lobby')
+    expect(vi.getTimerCount()).toBe(0)
+    expect(() => r.start()).not.toThrow()
+    expect(r.phase).toBe('carving')
+    r.dispose()
+    err.mockRestore()
+  })
+
+  it('start() rolls back when setRoomStatus throws', () => {
+    const room = store.all()[0]!
+    const spy = vi.spyOn(repo, 'setRoomStatus').mockImplementationOnce(() => { throw new Error('db') })
+    const r = new RoomRuntime({ room, store, repo, module: pumpkinModule, send: () => {} })
+    expect(() => r.start()).toThrow(/db/)
+    expect(() => r.start()).not.toThrow()
+    r.dispose()
+    spy.mockRestore()
+  })
+
+  it('ends the room visibly when a timer-fired advance cannot enter the next phase', () => {
+    const err = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const room = store.all()[0]!
+    const r = new RoomRuntime({
+      room, store, repo, module: failingOn(p => p === 'vote-scariest'),
+      send: (to, message) => sent.push({ to, message }),
+    })
+    r.start()
+    sent.length = 0
+    vi.advanceTimersByTime(180_000)
+    const errors = sent.filter(s => s.message.type === 'error')
+    expect(errors).toHaveLength(ids.length)
+    expect((errors[0]!.message as { code: string }).code).toBe('PHASE_FAILED')
+    expect(r.phase).toBe('results')
+    expect(vi.getTimerCount()).toBe(0)
+    r.dispose()
+    err.mockRestore()
+  })
+
+  it('keeps the pending timer when an early advance fails', () => {
+    const err = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const room = store.all()[0]!
+    const r = new RoomRuntime({
+      room, store, repo, module: failingOn(p => p === 'vote-scariest'), send: () => {},
+    })
+    r.start()
+    for (const id of ids) r.dispatch(id, { type: 'SUBMIT', strokes })
+    expect(r.phase).toBe('carving')
+    expect(vi.getTimerCount()).toBe(1)
+    r.dispose()
+    err.mockRestore()
+  })
+})
+
+describe('disposed and logging hygiene', () => {
+  it('start() after dispose throws', () => {
+    runtime.dispose()
+    expect(() => runtime.start()).toThrow(/disposed/i)
+  })
+
+  it('a module cannot arm a timer after dispose', () => {
+    let ctx: Parameters<GameModule<unknown, unknown, unknown>['onPhaseEnter']>[2] | null = null
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const mod: GameModule<any, any, any> = {
+      ...pumpkinModule,
+      onPhaseEnter(state, phase, c) { ctx = c },
+    }
+    const room = store.all()[0]!
+    const r = new RoomRuntime({ room, store, repo, module: mod, send: () => {} })
+    r.start()
+    r.dispose()
+    ctx!.setTimer(1_000, () => {})
+    expect(vi.getTimerCount()).toBe(0)
+  })
+
+  it('truncates and de-newlines a client-controlled action type in logs', () => {
+    const err = vi.spyOn(console, 'error').mockImplementation(() => {})
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const bad: GameModule<any, any, any> = { ...pumpkinModule, reduce: () => { throw new Error('x') } }
+    const room = store.all()[0]!
+    const r = new RoomRuntime({ room, store, repo, module: bad, send: () => {} })
+    r.start()
+    r.dispatch(ids[0]!, { type: 'A\nFAKE LOG LINE ' + 'y'.repeat(500) })
+    const line = String(err.mock.calls[0]![0])
+    expect(line).not.toContain('\n')
+    expect(line).not.toContain('y'.repeat(20))
+    r.dispose()
+    err.mockRestore()
+  })
+})
