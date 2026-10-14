@@ -663,6 +663,75 @@
   grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
 }
 
+/* The bar that shows up once your vote is in. Sticky at the bottom rather than
+   inserted above the grid: the vote stays changeable, so the pumpkin you just
+   tapped must not jump out from under your finger. */
+.vote-wait {
+  position: sticky;
+  bottom: 12px;
+  /* Capped and centred: stretched across a wide stage it reads as a page
+     footer rather than a thing that just happened. */
+  max-width: 560px;
+  margin: 16px auto 0;
+  padding: 14px 18px;
+  text-align: center;
+  border-radius: 14px;
+  background: #1A1826;
+  background: color-mix(in srgb, var(--shell-surface) 94%, transparent);
+  border: 1px solid var(--shell-border);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+  animation: vote-wait-in 220ms ease-out both;
+}
+
+@keyframes vote-wait-in {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: none; }
+}
+
+.vote-wait-line {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  letter-spacing: 0.02em;
+  color: #FFF4E8;
+  text-shadow: 0 0 10px var(--glow);
+}
+
+.vote-wait-track {
+  height: 6px;
+  max-width: 320px;
+  margin: 10px auto 8px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: #241F33;
+  background: color-mix(in srgb, var(--shell-bg) 70%, var(--shell-border));
+}
+
+.vote-wait-fill {
+  height: 100%;
+  background: var(--accent);
+  box-shadow: 0 0 10px var(--glow);
+  transition: width 240ms ease-out;
+}
+
+.vote-wait-count {
+  margin: 0;
+  font-weight: 700;
+  color: var(--glow);
+}
+
+.vote-wait-hint {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: var(--shell-muted);
+}
+
+/* After the rules above, or source order drops it. */
+@media (prefers-reduced-motion: reduce) {
+  .vote-wait { animation: none; }
+  .vote-wait-fill { transition: none; }
+}
+
 .award-grid {
   display: grid;
   gap: 12px;

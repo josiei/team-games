@@ -140,6 +140,33 @@ export function reduce(
   }
 }
 
+/**
+ * Nothing left to wait for: everyone still here has submitted, or has already
+ * voted on the award in play. The room moves on instead of burning the rest of
+ * the clock, so a vote between four people takes as long as those four take.
+ *
+ * An empty room is never complete: one blip that drops everybody must not
+ * discard every unsubmitted carving or decide an award on no votes at all. The
+ * phase clock stays the backstop for that case.
+ *
+ * Spectators are filtered out here rather than trusted to be absent, so the
+ * rule holds whatever the caller passes.
+ */
+export function phaseComplete(
+  state: PumpkinState, phase: string, players: Player[],
+): boolean {
+  const taking = players.filter(p => state.pumpkins[p.id] !== undefined)
+  if (taking.length === 0) return false
+
+  if (phase === 'carving') {
+    return taking.every(p => state.pumpkins[p.id]?.submitted === true)
+  }
+
+  const award = AWARD_BY_PHASE[phase as PumpkinPhase]
+  if (!award) return false            // lobby, results, or a phase we do not know
+  return taking.every(p => state.votes[award][p.id] !== undefined)
+}
+
 export type AwardResult = { slot: number; votes: number } | null
 
 /**
@@ -190,6 +217,11 @@ export type PumpkinView =
       gallery: GalleryEntry[]
       mySlot: number
       myVote: number | null
+      /* Counts, never voter ids: who voted for what stays secret until the
+         tally. Both count participants, so a disconnected player is still in
+         the denominator even though the phase will not wait for them. */
+      votedCount: number
+      totalVoters: number
     }
   | {
       kind: 'results'
@@ -254,5 +286,7 @@ export function viewFor(state: PumpkinState, viewer: PlayerId): PumpkinView {
     gallery: gallery(state),
     mySlot: slotOf(state, viewer),
     myVote: state.votes[award][viewer] ?? null,
+    votedCount: state.slots.filter(owner => state.votes[award][owner] !== undefined).length,
+    totalVoters: totalPlayers,
   }
 }

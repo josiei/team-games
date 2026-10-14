@@ -30,12 +30,20 @@ export const ACT_MS = 3200
  */
 const SEEN_KEY = 'tg.catwalk.seen'
 
-export function showSeen(): boolean {
-  try { return sessionStorage.getItem(SEEN_KEY) === '1' } catch { return true }
+/**
+ * Remembered per room, not per tab. A refresh of the same results screen must
+ * not replay thirteen unskippable seconds — but the next game is a different
+ * show, and a tab-wide flag silently retired the reveal for every game after
+ * the first in the same tab. Storing the room id makes a new room replay it.
+ */
+export function showSeen(roomId: string): boolean {
+  if (!roomId) return false
+  try { return sessionStorage.getItem(SEEN_KEY) === roomId } catch { return true }
 }
 
-export function markShowSeen(): void {
-  try { sessionStorage.setItem(SEEN_KEY, '1') } catch { /* degrade */ }
+export function markShowSeen(roomId: string): void {
+  if (!roomId) return
+  try { sessionStorage.setItem(SEEN_KEY, roomId) } catch { /* degrade */ }
 }
 
 export type Act = {

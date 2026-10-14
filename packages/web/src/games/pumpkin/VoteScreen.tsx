@@ -4,6 +4,7 @@ import { useConnection } from '../../store/connection.js'
 import { Timer } from '../../ui/Timer.js'
 import { HostLine } from '../../ui/HostLine.js'
 import { PumpkinThumb } from './PumpkinThumb.js'
+import { VoteWaiting } from './VoteWaiting.js'
 import '../../theme/neon.css'
 
 export function VoteScreen() {
@@ -60,6 +61,15 @@ export function VoteScreen() {
           )
         })}
       </div>
+
+      {/* Keyed on the award: each one gets its own fresh rotation. */}
+      {view.myVote !== null && (
+        <VoteWaiting
+          key={view.award}
+          votedCount={view.votedCount}
+          totalVoters={view.totalVoters}
+        />
+      )}
       </div>
     </main>
   )

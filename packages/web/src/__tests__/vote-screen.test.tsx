@@ -1,9 +1,10 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { fireEvent, render, screen } from '@testing-library/react'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { act, fireEvent, render, screen } from '@testing-library/react'
 import { VoteScreen } from '../games/pumpkin/VoteScreen.js'
 import { useConnection } from '../store/connection.js'
 import { asPlayerId } from '@tg/shared'
 import { PumpkinThumb } from '../games/pumpkin/PumpkinThumb.js'
+import { ALL_IN_LINE, WAITING_ROTATE_MS, waitingLine } from '../games/pumpkin/waiting.js'
 
 const NAMES = /Zephyrine|Quillfeather|Bartholomew|Gnarlwick/
 /** Identifiable hits: 'text', or 'attr:<name>@<TAG>' for each attribute value matching a name. */
@@ -28,7 +29,7 @@ const setView = (over: Record<string, unknown> = {}) =>
     view: {
       kind: 'voting', award: 'scariest',
       gallery: [entry(0), entry(1), entry(2)],
-      mySlot: 1, myVote: null, ...over,
+      mySlot: 1, myVote: null, votedCount: 0, totalVoters: 3, ...over,
     },
   })
 
@@ -178,5 +179,82 @@ describe('VoteScreen', () => {
     const img = screen.getByRole('img', { name: /pumpkin 1.*someone/i })
     expect(img.getAttribute('aria-pressed')).toBeNull()
     expect((img as HTMLElement).style.opacity).toBe('1')
+  })
+})
+
+describe('waiting for the rest of the room', () => {
+  afterEach(() => { vi.useRealTimers() })
+
+  it('says nothing until your vote is in', () => {
+    render(<VoteScreen />)
+    expect(screen.queryByLabelText('Your vote is in')).toBeNull()
+  })
+
+  it('appears with the room\'s progress once you have voted', () => {
+    setView({ myVote: 0, votedCount: 2, totalVoters: 3 })
+    render(<VoteScreen />)
+    expect(screen.getByLabelText('Your vote is in')).toBeTruthy()
+    expect(screen.getByText('2 of 3 votes in')).toBeTruthy()
+    expect(screen.getByText(waitingLine(0))).toBeTruthy()
+  })
+
+  it('leaves the pumpkins live, so a mis-tap can still be changed', () => {
+    setView({ myVote: 0, votedCount: 2, totalVoters: 3 })
+    render(<VoteScreen />)
+    expect(screen.getByText(/changed your mind/i)).toBeTruthy()
+    const cards = screen.getAllByRole('button', { name: /pumpkin/i })
+    const mine = cards.filter(c => !(c as HTMLButtonElement).disabled)
+    expect(mine.length).toBe(2)       // every pumpkin but my own
+    expect(() => fireEvent.click(mine[1]!)).not.toThrow()
+  })
+
+  it('rotates the line rather than repeating one for the whole wait', () => {
+    vi.useFakeTimers()
+    setView({ myVote: 0, votedCount: 1, totalVoters: 3 })
+    render(<VoteScreen />)
+    expect(screen.getByText(waitingLine(0))).toBeTruthy()
+    act(() => { vi.advanceTimersByTime(WAITING_ROTATE_MS) })
+    expect(screen.getByText(waitingLine(1))).toBeTruthy()
+    act(() => { vi.advanceTimersByTime(WAITING_ROTATE_MS) })
+    expect(screen.getByText(waitingLine(2))).toBeTruthy()
+  })
+
+  it('stops claiming it is waiting on anyone once everybody is in', () => {
+    vi.useFakeTimers()
+    setView({ myVote: 0, votedCount: 3, totalVoters: 3 })
+    render(<VoteScreen />)
+    expect(screen.getByText(ALL_IN_LINE)).toBeTruthy()
+    // The room moves on in well under a second; offering a change there is a lie.
+    expect(screen.queryByText(/changed your mind/i)).toBeNull()
+    // And no interval left ticking behind it: the room is about to move on.
+    expect(vi.getTimerCount()).toBe(0)
+    act(() => { vi.advanceTimersByTime(WAITING_ROTATE_MS * 3) })
+    expect(screen.getByText(ALL_IN_LINE)).toBeTruthy()
+  })
+
+  it('starts the rotation over on the next award', () => {
+    vi.useFakeTimers()
+    setView({ myVote: 0, votedCount: 1, totalVoters: 3 })
+    const { rerender } = render(<VoteScreen />)
+    act(() => { vi.advanceTimersByTime(WAITING_ROTATE_MS) })
+    expect(screen.getByText(waitingLine(1))).toBeTruthy()
+
+    act(() => { setView({ award: 'funniest', myVote: 0, votedCount: 1, totalVoters: 3 }) })
+    rerender(<VoteScreen />)
+    expect(screen.getByText(waitingLine(0))).toBeTruthy()
+  })
+
+  it('paints no NaN if a voting view ever arrives with nobody in it', () => {
+    setView({ myVote: 0, votedCount: 0, totalVoters: 0 })
+    render(<VoteScreen />)
+    const fill = document.querySelector('.vote-wait-fill') as HTMLElement
+    expect(fill.style.width).toBe('0%')
+    expect(document.body.textContent).not.toMatch(/NaN/)
+  })
+
+  it('names nobody while it waits', () => {
+    setView({ myVote: 0, votedCount: 2, totalVoters: 3 })
+    render(<VoteScreen />)
+    expect(leaks(screen.getByLabelText('Your vote is in'))).toEqual([])
   })
 })

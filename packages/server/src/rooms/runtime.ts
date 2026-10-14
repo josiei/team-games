@@ -12,6 +12,13 @@ function logSafe(text: string): string {
 
 type Send = (to: PlayerId, message: ServerMessage) => void
 
+/**
+ * The beat between the last player finishing a phase and the screen changing.
+ * Without it the final count never renders: the snapshot carrying "4 of 4 in"
+ * and the snapshot replacing the screen would arrive in the same tick.
+ */
+export const EARLY_ADVANCE_MS = 700
+
 export class RoomRuntime {
   private readonly room: LiveRoom
   private readonly store: RoomStore
@@ -22,6 +29,7 @@ export class RoomRuntime {
   // The phase timer and module timers live apart: a module calling setTimer
   // must never cancel the clock that advances its own phase.
   private phaseTimer: ReturnType<typeof setTimeout> | null = null
+  private earlyTimer: ReturnType<typeof setTimeout> | null = null
   private readonly moduleTimers = new Set<ReturnType<typeof setTimeout>>()
   private phaseEndsAt: number | null = null
   private started = false
@@ -109,10 +117,9 @@ export class RoomRuntime {
     // strokes would be shipped to everyone.
     if (action.type === 'DRAFT') return
 
-    if (this.room.phase === 'carving' && this.allConnectedSubmitted()) {
-      this.advancePhase()   // enterPhase broadcasts the new snapshot
-      return
-    }
+    // Broadcast either way: this snapshot carries the count that explains why
+    // the screen is about to change.
+    if (this.phaseDone()) this.scheduleEarlyAdvance()
     this.broadcastSnapshot()
   }
 
@@ -169,10 +176,8 @@ export class RoomRuntime {
     this.store.reassignHostIfNeeded(this.room)
     this.repo.setHost(this.room.workspaceId, this.room.id, this.room.hostId)
 
-    if (this.started && this.room.phase === 'carving' && this.allConnectedSubmitted()) {
-      this.advancePhase()   // enterPhase broadcasts the new snapshot
-      return
-    }
+    // The player who just left may have been the last holdout.
+    if (this.phaseDone()) this.scheduleEarlyAdvance()
     this.broadcastSnapshot()
   }
 
@@ -304,9 +309,12 @@ export class RoomRuntime {
     }
   }
 
+  /** Both clocks that can end this phase: its duration, and a pending early advance. */
   private clearPhaseTimer(): void {
     if (this.phaseTimer) clearTimeout(this.phaseTimer)
     this.phaseTimer = null
+    if (this.earlyTimer) clearTimeout(this.earlyTimer)
+    this.earlyTimer = null
   }
 
   private clearModuleTimers(): void {
@@ -336,13 +344,33 @@ export class RoomRuntime {
     }
   }
 
-  private allConnectedSubmitted(): boolean {
-    const waiting = this.store.participants(this.room).filter(p => p.connected)
-    // Nobody connected: stall and let the phase clock decide, so a blip for
-    // everyone does not discard every unsubmitted carving.
-    if (waiting.length === 0) return false
-    const state = this.room.state as { pumpkins: Record<string, { submitted: boolean }> }
-    return waiting.every(p => state.pumpkins[p.id]?.submitted === true)
+  /**
+   * Asks the game whether this phase has anything left to wait for. The rule
+   * belongs to the module — the runtime knows nothing about pumpkins or votes —
+   * and a game that leaves the hook out simply runs every phase to its clock.
+   * A throw in there must not take the dispatch down with it.
+   */
+  private phaseDone(): boolean {
+    if (!this.module.phaseComplete || !this.started || this.disposed) return false
+    const index = this.module.phases.indexOf(this.room.phase)
+    if (index < 0 || index >= this.module.phases.length - 1) return false   // nothing after this
+    const here = this.store.participants(this.room).filter(p => p.connected)
+    try {
+      return this.module.phaseComplete(this.room.state, this.room.phase, here) === true
+    } catch (error) {
+      console.error(
+        `[room ${this.room.id}] phaseComplete threw in phase ${logSafe(this.room.phase)}:`, error)
+      return false
+    }
+  }
+
+  /** Idempotent: the second player to finish must not queue a second advance. */
+  private scheduleEarlyAdvance(): void {
+    if (this.earlyTimer || this.disposed) return
+    this.earlyTimer = setTimeout(() => {
+      this.earlyTimer = null
+      this.advancePhase()
+    }, EARLY_ADVANCE_MS)
   }
 
   private broadcast(message: ServerMessage): void {

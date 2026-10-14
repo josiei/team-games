@@ -1,5 +1,5 @@
 import {
-  AWARD_LABELS, PUMPKIN_PHASES, createState, reduce, setPhase, tally, viewFor,
+  AWARD_LABELS, PUMPKIN_PHASES, createState, phaseComplete, reduce, setPhase, tally, viewFor,
   type GameModule, type PumpkinAction, type PumpkinState, type PumpkinView,
 } from '@tg/shared'
 
@@ -31,6 +31,7 @@ export const pumpkinModule: GameModule<PumpkinState, PumpkinAction, PumpkinView>
   setPhase,
   reduce,
   viewFor,
+  phaseComplete,
 
   onPhaseEnter(state, phase, ctx) {
     const line = this.hostLines[phase]?.[0]

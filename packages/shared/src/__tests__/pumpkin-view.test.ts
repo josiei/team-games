@@ -88,8 +88,30 @@ describe('viewFor during voting', () => {
   it('pins the exact top-level key set of the voting view', () => {
     for (const [phase, award] of VOTE_PHASES) {
       const view = viewFor(withVotes(phase, award), A)
-      expect(Object.keys(view).sort()).toEqual(['award', 'gallery', 'kind', 'mySlot', 'myVote'])
+      expect(Object.keys(view).sort()).toEqual(
+        ['award', 'gallery', 'kind', 'mySlot', 'myVote', 'totalVoters', 'votedCount'])
     }
+  })
+
+  it('counts votes cast without saying whose they are', () => {
+    const [phase, award] = VOTE_PHASES[0]!
+    let s = setPhase(carved(), phase)
+    const seen = (viewer: typeof A) => {
+      const v = viewFor(s, viewer)
+      if (v.kind !== 'voting') throw new Error('wrong view')
+      return [v.votedCount, v.totalVoters]
+    }
+    expect(seen(A)).toEqual([0, 3])
+    s = reduce(s, { type: 'VOTE', award, slot: slotOf(s, B) }, A)
+    expect(seen(A)).toEqual([1, 3])
+    // Every viewer sees the same count: it is the room's progress, not theirs.
+    expect(seen(C)).toEqual([1, 3])
+    // Changing your mind is not a second vote.
+    s = reduce(s, { type: 'VOTE', award, slot: slotOf(s, C) }, A)
+    expect(seen(A)).toEqual([1, 3])
+    s = reduce(s, { type: 'VOTE', award, slot: slotOf(s, A) }, B)
+    s = reduce(s, { type: 'VOTE', award, slot: slotOf(s, A) }, C)
+    expect(seen(A)).toEqual([3, 3])
   })
 
   it('exposes no owner-shaped key on gallery entries', () => {

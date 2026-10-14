@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { InMemoryRoomStore } from '../rooms/store.js'
-import { RoomRuntime } from '../rooms/runtime.js'
+import { EARLY_ADVANCE_MS, RoomRuntime } from '../rooms/runtime.js'
 import { pumpkinModule } from '../games/pumpkin/index.js'
 import { createDb } from '../db/client.js'
 import { Repo } from '../db/repo.js'
@@ -144,6 +144,19 @@ describe('early exit', () => {
   it('ends carving as soon as every connected player has submitted', () => {
     runtime.start()
     for (const id of ids) runtime.dispatch(id, { type: 'SUBMIT', strokes })
+    vi.advanceTimersByTime(EARLY_ADVANCE_MS)
+    expect(runtime.phase).toBe('vote-scariest')
+  })
+
+  it('holds the screen for a beat, so the final count can land', () => {
+    runtime.start()
+    for (const id of ids) runtime.dispatch(id, { type: 'SUBMIT', strokes })
+    vi.advanceTimersByTime(EARLY_ADVANCE_MS - 1)
+    expect(runtime.phase).toBe('carving')
+    // And the snapshot sent in that window says everyone is in.
+    const snap = runtime.snapshotFor(ids[0]!) as Snap
+    expect((snap.view as { submittedCount: number }).submittedCount).toBe(3)
+    vi.advanceTimersByTime(1)
     expect(runtime.phase).toBe('vote-scariest')
   })
 
@@ -152,6 +165,7 @@ describe('early exit', () => {
     runtime.onDisconnect(ids[2]!)
     runtime.dispatch(ids[0]!, { type: 'SUBMIT', strokes })
     runtime.dispatch(ids[1]!, { type: 'SUBMIT', strokes })
+    vi.advanceTimersByTime(EARLY_ADVANCE_MS)
     expect(runtime.phase).toBe('vote-scariest')
   })
 
@@ -161,13 +175,80 @@ describe('early exit', () => {
     runtime.dispatch(ids[1]!, { type: 'SUBMIT', strokes })
     expect(runtime.phase).toBe('carving')
     runtime.onDisconnect(ids[2]!)
+    vi.advanceTimersByTime(EARLY_ADVANCE_MS)
     expect(runtime.phase).toBe('vote-scariest')
   })
 
   it('keeps waiting while someone connected has not submitted', () => {
     runtime.start()
     runtime.dispatch(ids[0]!, { type: 'SUBMIT', strokes })
+    vi.advanceTimersByTime(EARLY_ADVANCE_MS)
     expect(runtime.phase).toBe('carving')
+  })
+
+  // The point of the whole change: a vote between three people takes as long
+  // as those three take, not the full fifteen seconds every single time.
+  const voteSlot = (voter: PlayerId): number => {
+    const snap = runtime.snapshotFor(voter) as Snap
+    const view = snap.view as { gallery: { slot: number }[]; mySlot: number }
+    return view.gallery.find(g => g.slot !== view.mySlot)!.slot
+  }
+
+  const reachVoting = () => {
+    runtime.start()
+    for (const id of ids) runtime.dispatch(id, { type: 'SUBMIT', strokes })
+    vi.advanceTimersByTime(EARLY_ADVANCE_MS)
+  }
+
+  it('ends a vote as soon as everyone has voted', () => {
+    reachVoting()
+    expect(runtime.phase).toBe('vote-scariest')
+    for (const id of ids) {
+      runtime.dispatch(id, { type: 'VOTE', award: 'scariest', slot: voteSlot(id) })
+    }
+    vi.advanceTimersByTime(EARLY_ADVANCE_MS)
+    expect(runtime.phase).toBe('vote-funniest')
+  })
+
+  it('keeps the vote open while anyone has not voted', () => {
+    reachVoting()
+    runtime.dispatch(ids[0]!, { type: 'VOTE', award: 'scariest', slot: voteSlot(ids[0]!) })
+    runtime.dispatch(ids[1]!, { type: 'VOTE', award: 'scariest', slot: voteSlot(ids[1]!) })
+    vi.advanceTimersByTime(EARLY_ADVANCE_MS)
+    expect(runtime.phase).toBe('vote-scariest')
+  })
+
+  it('lets a voter change their mind without ending the phase twice', () => {
+    reachVoting()
+    for (const id of ids) {
+      runtime.dispatch(id, { type: 'VOTE', award: 'scariest', slot: voteSlot(id) })
+    }
+    // A change of mind inside the beat must not queue a second advance, or the
+    // room would skip the award after this one.
+    runtime.dispatch(ids[0]!, { type: 'VOTE', award: 'scariest', slot: voteSlot(ids[0]!) })
+    vi.advanceTimersByTime(EARLY_ADVANCE_MS)
+    expect(runtime.phase).toBe('vote-funniest')
+    vi.advanceTimersByTime(EARLY_ADVANCE_MS)
+    expect(runtime.phase).toBe('vote-funniest')
+  })
+
+  it('runs the whole game on votes alone, never touching a phase clock', () => {
+    reachVoting()
+    for (const award of ['scariest', 'funniest', 'craft', 'cursed'] as const) {
+      for (const id of ids) runtime.dispatch(id, { type: 'VOTE', award, slot: voteSlot(id) })
+      vi.advanceTimersByTime(EARLY_ADVANCE_MS)
+    }
+    expect(runtime.phase).toBe('results')
+  })
+
+  it('leaves the early clock behind when the phase ends on its own first', () => {
+    reachVoting()
+    runtime.dispatch(ids[0]!, { type: 'VOTE', award: 'scariest', slot: voteSlot(ids[0]!) })
+    vi.advanceTimersByTime(15_000)            // the vote clock runs out
+    expect(runtime.phase).toBe('vote-funniest')
+    const before = runtime.phase
+    vi.advanceTimersByTime(EARLY_ADVANCE_MS)  // no stale beat from the last phase
+    expect(runtime.phase).toBe(before)
   })
 })
 
@@ -442,6 +523,7 @@ describe('phase failure', () => {
     })
     r.start()
     for (const id of ids) r.dispatch(id, { type: 'SUBMIT', strokes })
+    vi.advanceTimersByTime(EARLY_ADVANCE_MS)
     expect(r.phase).toBe('carving')
     expect(vi.getTimerCount()).toBe(1)
     r.dispose()

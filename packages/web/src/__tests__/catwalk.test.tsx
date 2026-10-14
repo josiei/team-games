@@ -167,9 +167,21 @@ describe('Catwalk', () => {
 
 describe('showSeen', () => {
   it('starts false and latches once the show has run', () => {
-    expect(showSeen()).toBe(false)
-    markShowSeen()
-    expect(showSeen()).toBe(true)
+    expect(showSeen('room-a')).toBe(false)
+    markShowSeen('room-a')
+    expect(showSeen('room-a')).toBe(true)
+  })
+
+  // The bug this replaced: one tab-wide flag meant the reveal ran for the
+  // first game of a session and silently never again, however many rooms.
+  it('does not count another room as seen', () => {
+    markShowSeen('room-a')
+    expect(showSeen('room-b')).toBe(false)
+  })
+
+  it('treats a missing room id as unseen, rather than latching on nothing', () => {
+    markShowSeen('')
+    expect(showSeen('')).toBe(false)
   })
 
   it('reads as seen where storage throws, rather than replaying the show', () => {
@@ -177,7 +189,7 @@ describe('showSeen', () => {
       getItem() { throw new Error('blocked') },
       setItem() { throw new Error('blocked') },
     })
-    expect(showSeen()).toBe(true)
-    expect(() => markShowSeen()).not.toThrow()
+    expect(showSeen('room-a')).toBe(true)
+    expect(() => markShowSeen('room-a')).not.toThrow()
   })
 })

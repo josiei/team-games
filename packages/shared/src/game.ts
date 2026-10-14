@@ -39,6 +39,14 @@ export interface GameModule<State, Action, View> {
   reduce(state: State, action: Action, by: PlayerId): State
   onPhaseEnter(state: State, phase: string, ctx: RoomContext): void
   viewFor(state: State, viewer: PlayerId): View
+
+  /**
+   * True when this phase has nothing left to wait for, so the room can move on
+   * without burning the rest of the clock. `players` is everyone still
+   * connected who is taking part; a game that cannot end a phase early simply
+   * leaves this out and every phase runs its full duration.
+   */
+  phaseComplete?(state: State, phase: string, players: Player[]): boolean
 }
 
 /**

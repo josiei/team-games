@@ -149,7 +149,7 @@ function Router() {
   }
   if (view.kind === 'carving') return <CarveScreen roomId={identity.roomId} />
   if (view.kind === 'voting' || view.kind === 'spectator') return <VoteScreen />
-  if (view.kind === 'results') return <ResultsScreen onLeave={leave} />
+  if (view.kind === 'results') return <ResultsScreen roomId={identity.roomId} onLeave={leave} />
   return <p>View: {(view as { kind: string }).kind}</p>
 }
 

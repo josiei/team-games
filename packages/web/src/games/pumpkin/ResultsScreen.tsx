@@ -19,14 +19,14 @@ type ResultsView = {
 
 const UNKNOWN_CARVER = 'Unknown carver'
 
-export function ResultsScreen({ onLeave }: { onLeave?: () => void } = {}) {
+export function ResultsScreen({ roomId, onLeave }: { roomId: string; onLeave?: () => void }) {
   const view = useConnection(s => s.view) as ResultsView
   const labels = useConnection(s => s.labels)
-  // Decided once per mount, but remembered for the browsing session: a refresh
+  // Decided once per mount, but remembered for this room: a refresh
   // or taking the session back from another tab remounts this screen, and
   // without the stored flag the full thirteen seconds would replay before the
   // grid became reachable — with no skip control to escape it.
-  const [showOver, setShowOver] = useState(() => prefersReducedMotion() || showSeen())
+  const [showOver, setShowOver] = useState(() => prefersReducedMotion() || showSeen(roomId))
 
   // Always the disambiguated label, never displayName: two players called
   // Jocelyn must be told apart exactly when their work is attributed.
@@ -40,7 +40,7 @@ export function ResultsScreen({ onLeave }: { onLeave?: () => void } = {}) {
   const acts = actsFrom(view.winners, view.gallery, nameFor)
 
   if (!showOver && acts.length > 0) {
-    return <Catwalk acts={acts} onDone={() => { markShowSeen(); setShowOver(true) }} />
+    return <Catwalk acts={acts} onDone={() => { markShowSeen(roomId); setShowOver(true) }} />
   }
 
   return (
