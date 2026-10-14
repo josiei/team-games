@@ -241,6 +241,65 @@ describe('early exit', () => {
     expect(runtime.phase).toBe('results')
   })
 
+  // A refresh is a disconnect followed by a connect. If the beat fires blind,
+  // the phase ends while the returning player is still mid-reload, and their
+  // carving or their vote is simply dropped.
+  it('calls off the beat when the last holdout comes back inside it', () => {
+    runtime.start()
+    runtime.dispatch(ids[0]!, { type: 'SUBMIT', strokes })
+    runtime.dispatch(ids[1]!, { type: 'SUBMIT', strokes })
+    runtime.onDisconnect(ids[2]!)
+    vi.advanceTimersByTime(EARLY_ADVANCE_MS - 100)
+    runtime.onConnect(ids[2]!)
+    vi.advanceTimersByTime(400)
+    expect(runtime.phase).toBe('carving')
+    // and they can still finish the pumpkin they came back for
+    runtime.dispatch(ids[2]!, { type: 'SUBMIT', strokes })
+    vi.advanceTimersByTime(EARLY_ADVANCE_MS)
+    expect(runtime.phase).toBe('vote-scariest')
+  })
+
+  it('does not decide an award while the missing voter is reconnecting', () => {
+    reachVoting()
+    runtime.dispatch(ids[0]!, { type: 'VOTE', award: 'scariest', slot: voteSlot(ids[0]!) })
+    runtime.dispatch(ids[1]!, { type: 'VOTE', award: 'scariest', slot: voteSlot(ids[1]!) })
+    runtime.onDisconnect(ids[2]!)
+    vi.advanceTimersByTime(EARLY_ADVANCE_MS - 100)
+    runtime.onConnect(ids[2]!)
+    vi.advanceTimersByTime(400)
+    expect(runtime.phase).toBe('vote-scariest')
+  })
+
+  it('moves on when someone returns to a phase that is already finished', () => {
+    reachVoting()
+    for (const id of ids) {
+      runtime.dispatch(id, { type: 'VOTE', award: 'scariest', slot: voteSlot(id) })
+    }
+    runtime.onDisconnect(ids[2]!)      // cancels nothing: everyone has voted
+    vi.advanceTimersByTime(EARLY_ADVANCE_MS)
+    expect(runtime.phase).toBe('vote-funniest')
+  })
+
+  // The bar on screen says "n of m votes in". If m counted players the phase
+  // will never wait for, it could never reach m — and the client would go on
+  // offering "changed your mind?" as the phase cut underneath it.
+  it('counts the vote against who is still here', () => {
+    reachVoting()
+    runtime.onDisconnect(ids[2]!)
+    const progress = (of: PlayerId) => {
+      const view = (runtime.snapshotFor(of) as Snap).view as
+        { votedCount: number; totalVoters: number }
+      return [view.votedCount, view.totalVoters]
+    }
+    expect(progress(ids[0]!)).toEqual([0, 2])
+    runtime.dispatch(ids[0]!, { type: 'VOTE', award: 'scariest', slot: voteSlot(ids[0]!) })
+    expect(progress(ids[0]!)).toEqual([1, 2])
+    runtime.dispatch(ids[1]!, { type: 'VOTE', award: 'scariest', slot: voteSlot(ids[1]!) })
+    expect(progress(ids[0]!)).toEqual([2, 2])    // reachable, and the phase now ends
+    vi.advanceTimersByTime(EARLY_ADVANCE_MS)
+    expect(runtime.phase).toBe('vote-funniest')
+  })
+
   it('leaves the early clock behind when the phase ends on its own first', () => {
     reachVoting()
     runtime.dispatch(ids[0]!, { type: 'VOTE', award: 'scariest', slot: voteSlot(ids[0]!) })

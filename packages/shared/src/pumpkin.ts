@@ -230,6 +230,23 @@ export type PumpkinView =
       carvers: Record<number, PlayerId>
     }
 
+/**
+ * Counts over the players the phase is actually waiting on, so the total is
+ * one the room can reach. Called without that set — the pure-logic tests, a
+ * caller that has no connection state — it counts everyone who carved.
+ */
+function voteProgress(
+  state: PumpkinState, award: AwardKey, waiting?: Player[],
+): { votedCount: number; totalVoters: number } {
+  const owners = waiting
+    ? waiting.map(p => p.id).filter(id => state.pumpkins[id] !== undefined)
+    : state.slots
+  return {
+    votedCount: owners.filter(owner => state.votes[award][owner] !== undefined).length,
+    totalVoters: owners.length,
+  }
+}
+
 function gallery(state: PumpkinState): GalleryEntry[] {
   return state.slots.map((owner, slot) => {
     const pumpkin = state.pumpkins[owner]
@@ -242,7 +259,9 @@ function gallery(state: PumpkinState): GalleryEntry[] {
   })
 }
 
-export function viewFor(state: PumpkinState, viewer: PlayerId): PumpkinView {
+export function viewFor(
+  state: PumpkinState, viewer: PlayerId, waiting?: Player[],
+): PumpkinView {
   const totalPlayers = state.slots.length
 
   if (state.phase === 'lobby') {
@@ -286,7 +305,6 @@ export function viewFor(state: PumpkinState, viewer: PlayerId): PumpkinView {
     gallery: gallery(state),
     mySlot: slotOf(state, viewer),
     myVote: state.votes[award][viewer] ?? null,
-    votedCount: state.slots.filter(owner => state.votes[award][owner] !== undefined).length,
-    totalVoters: totalPlayers,
+    ...voteProgress(state, award, waiting),
   }
 }

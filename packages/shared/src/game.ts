@@ -38,7 +38,12 @@ export interface GameModule<State, Action, View> {
   setPhase(state: State, phase: string): State
   reduce(state: State, action: Action, by: PlayerId): State
   onPhaseEnter(state: State, phase: string, ctx: RoomContext): void
-  viewFor(state: State, viewer: PlayerId): View
+  /**
+   * `waiting` is everyone still connected who is taking part — the same set
+   * `phaseComplete` is asked about. A view that shows progress ("3 of 4 in")
+   * must count that set, or it reports a total the phase will never reach.
+   */
+  viewFor(state: State, viewer: PlayerId, waiting?: Player[]): View
 
   /**
    * True when this phase has nothing left to wait for, so the room can move on

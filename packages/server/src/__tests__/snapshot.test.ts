@@ -196,6 +196,45 @@ describe('resume after restore', () => {
     runtime.dispose()
   })
 
+  // The process can die in the 700ms between the last submit and the advance.
+  // Nobody is going to dispatch again, so unless coming back re-checks, the
+  // restored room sits on a finished phase for the rest of its clock.
+  it('moves on once the room is back, when the phase finished during the outage', () => {
+    vi.useFakeTimers()
+    const db = createDb(':memory:')
+    const first = bootRoom(db)
+    first.runtime.start()
+    const playerIds = [...first.room.players.keys()]
+    for (const id of playerIds) first.runtime.dispatch(id, { type: 'SUBMIT', strokes })
+    first.runtime.dispose()          // the beat dies with the process
+
+    const store = new InMemoryRoomStore()
+    const repo = new Repo(db)
+    restoreRooms(repo, store)
+    const room = store.byCode(asRoomCode('AB2CD3'))!
+    const runtime = new RoomRuntime({ room, store, repo, module: pumpkinModule, send: () => {} })
+    runtime.resume()
+    expect(room.phase).toBe('carving')      // nobody is back yet
+
+    // The rule waits on whoever is here, so the first player back is enough:
+    // the phase really was finished, and everyone else reconnects into voting.
+    runtime.onConnect(playerIds[0]!)
+    vi.advanceTimersByTime(1_000)
+    expect(room.phase).toBe('vote-scariest')
+    runtime.dispose()
+  })
+
+  it('does not move on for a player who comes back still unfinished', () => {
+    // Only the first player submitted before the crash.
+    const { room, runtime } = crashAndRestore(60_000)
+    runtime.resume()
+    const unfinished = [...room.players.keys()][1]!
+    runtime.onConnect(unfinished)
+    vi.advanceTimersByTime(1_000)
+    expect(room.phase).toBe('carving')
+    runtime.dispose()
+  })
+
   it('does not arm a second timer when resumed twice', () => {
     const { runtime } = crashAndRestore(60_000)
     runtime.resume()

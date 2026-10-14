@@ -707,9 +707,13 @@
   background: color-mix(in srgb, var(--shell-bg) 70%, var(--shell-border));
 }
 
+/* Painted as an image, not a background colour: forced-colors replaces colours
+   with system ones and would flatten the fill into the track, leaving a blank
+   strip. A background-image survives. */
 .vote-wait-fill {
   height: 100%;
-  background: var(--accent);
+  background-color: var(--accent);
+  background-image: linear-gradient(var(--accent), var(--accent));
   box-shadow: 0 0 10px var(--glow);
   transition: width 240ms ease-out;
 }

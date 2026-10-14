@@ -1,6 +1,6 @@
 import {
   labelPlayers,
-  type GameModule, type PlayerId, type RoomContext, type ServerMessage,
+  type GameModule, type Player, type PlayerId, type RoomContext, type ServerMessage,
 } from '@tg/shared'
 import type { Repo } from '../db/repo.js'
 import type { LiveRoom, RoomStore } from './store.js'
@@ -167,6 +167,8 @@ export class RoomRuntime {
   onConnect(playerId: PlayerId): void {
     this.store.setConnected(this.room, playerId, true)
     this.repo.setConnected(this.room.workspaceId, playerId, true)
+    // They may be returning to a phase that finished while they were away.
+    if (this.phaseDone()) this.scheduleEarlyAdvance()
     this.broadcastSnapshot()
   }
 
@@ -191,7 +193,9 @@ export class RoomRuntime {
       // results view carries carver ids that earlier views must not.
       view: this.room.state === null || this.failed
         ? { kind: 'lobby', playerCount: players.length }
-        : this.module.viewFor(this.room.state, playerId),
+        // The same set phaseComplete is asked about, so a view that shows
+        // progress counts a total the phase can actually reach.
+        : this.module.viewFor(this.room.state, playerId, this.waiting()),
       players,
       endsAt: this.phaseEndsAt,
       serverNow: Date.now(),
@@ -239,6 +243,9 @@ export class RoomRuntime {
     const remaining = Math.min(endsAt - Date.now(), cap)
     if (remaining > 0) {
       this.armPhaseTimer(phase, remaining)
+      // Everyone may have finished in the window the restart ate: nobody is
+      // going to dispatch again, so without this the room waits out the clock.
+      if (this.phaseDone()) this.scheduleEarlyAdvance()
       return
     }
     this.phaseEndsAt = null
@@ -354,9 +361,8 @@ export class RoomRuntime {
     if (!this.module.phaseComplete || !this.started || this.disposed) return false
     const index = this.module.phases.indexOf(this.room.phase)
     if (index < 0 || index >= this.module.phases.length - 1) return false   // nothing after this
-    const here = this.store.participants(this.room).filter(p => p.connected)
     try {
-      return this.module.phaseComplete(this.room.state, this.room.phase, here) === true
+      return this.module.phaseComplete(this.room.state, this.room.phase, this.waiting()) === true
     } catch (error) {
       console.error(
         `[room ${this.room.id}] phaseComplete threw in phase ${logSafe(this.room.phase)}:`, error)
@@ -364,11 +370,24 @@ export class RoomRuntime {
     }
   }
 
-  /** Idempotent: the second player to finish must not queue a second advance. */
+  /** Everyone still here and taking part: the set a phase waits on. */
+  private waiting(): Player[] {
+    return this.store.participants(this.room).filter(p => p.connected)
+  }
+
+  /**
+   * Idempotent: the second player to finish must not queue a second advance.
+   *
+   * The beat re-asks before it fires. A refresh is a disconnect followed by a
+   * connect, so the room can stop being finished inside those 700ms — and
+   * advancing blind would take the returning player's unsubmitted pumpkin, or
+   * decide an award they were still reconnecting to vote on.
+   */
   private scheduleEarlyAdvance(): void {
     if (this.earlyTimer || this.disposed) return
     this.earlyTimer = setTimeout(() => {
       this.earlyTimer = null
+      if (!this.phaseDone()) return this.broadcastSnapshot()
       this.advancePhase()
     }, EARLY_ADVANCE_MS)
   }
