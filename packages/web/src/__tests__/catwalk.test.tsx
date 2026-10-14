@@ -90,7 +90,7 @@ describe('Catwalk', () => {
     vi.useFakeTimers()
     const acts = actsFrom(WINNERS, GALLERY, nameFor)
     const onDone = vi.fn()
-    render(<Catwalk acts={acts} onDone={onDone} />)
+    render(<Catwalk code="ROOM01" acts={acts} onDone={onDone} />)
 
     expect(screen.getByText(/Most Cursed/)).toBeTruthy()
     expect(screen.getByText('Carver 3')).toBeTruthy()
@@ -115,14 +115,14 @@ describe('Catwalk', () => {
   it('says "vote" for a single vote', () => {
     vi.useFakeTimers()
     const acts = actsFrom({ craft: { slot: 2, votes: 1 } }, GALLERY, nameFor)
-    render(<Catwalk acts={acts} onDone={() => {}} />)
+    render(<Catwalk code="ROOM01" acts={acts} onDone={() => {}} />)
     expect(screen.getByText('1 vote')).toBeTruthy()
   })
 
   it('restarts the animations for each walker rather than reusing the nodes', () => {
     vi.useFakeTimers()
     const acts = actsFrom(WINNERS, GALLERY, nameFor)
-    const { container } = render(<Catwalk acts={acts} onDone={() => {}} />)
+    const { container } = render(<Catwalk code="ROOM01" acts={acts} onDone={() => {}} />)
     const grab = () => [
       container.querySelector('.walker'),
       container.querySelector('.catwalk-beam'),
@@ -143,12 +143,12 @@ describe('Catwalk', () => {
     vi.useFakeTimers()
     const onDone = vi.fn()
     const { rerender } = render(
-      <Catwalk acts={actsFrom(WINNERS, GALLERY, nameFor)} onDone={onDone} />)
+      <Catwalk code="ROOM01" acts={actsFrom(WINNERS, GALLERY, nameFor)} onDone={onDone} />)
     act(() => { vi.advanceTimersByTime(ACT_MS / 2) })
     // Every snapshot is a fresh JSON.parse, so `acts` is a new array each time.
     // Depending on its identity rather than its length would reset the timer on
     // each one and the show would never advance.
-    rerender(<Catwalk acts={actsFrom(WINNERS, GALLERY, nameFor)} onDone={onDone} />)
+    rerender(<Catwalk code="ROOM01" acts={actsFrom(WINNERS, GALLERY, nameFor)} onDone={onDone} />)
     act(() => { vi.advanceTimersByTime(ACT_MS / 2) })
     expect(screen.getByText(/Scariest/)).toBeTruthy()
   })
@@ -156,7 +156,7 @@ describe('Catwalk', () => {
   it('marks progress so the room can see the show has an end', () => {
     vi.useFakeTimers()
     const acts = actsFrom(WINNERS, GALLERY, nameFor)
-    const { container } = render(<Catwalk acts={acts} onDone={() => {}} />)
+    const { container } = render(<Catwalk code="ROOM01" acts={acts} onDone={() => {}} />)
     const classesAt = () => [...container.querySelectorAll('.catwalk-dots li')]
       .map(li => li.className)
     expect(classesAt()).toEqual(['is-now', '', '', ''])

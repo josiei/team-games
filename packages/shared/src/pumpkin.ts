@@ -204,6 +204,8 @@ export type PumpkinView =
   | { kind: 'spectator'; phase: string }
   | {
       kind: 'carving'
+      /** Which pumpkin is yours. The client draws the body its slot was given. */
+      mySlot: number
       myStrokes: Stroke[]
       submitted: boolean
       ratio: number
@@ -280,6 +282,7 @@ export function viewFor(
     const ratio = carvedRatio(strokes)
     return {
       kind: 'carving',
+      mySlot: slotOf(state, viewer),
       myStrokes: strokes,
       submitted: mine?.submitted ?? false,
       ratio,

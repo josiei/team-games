@@ -19,7 +19,9 @@ type ResultsView = {
 
 const UNKNOWN_CARVER = 'Unknown carver'
 
-export function ResultsScreen({ roomId, onLeave }: { roomId: string; onLeave?: () => void }) {
+export function ResultsScreen(
+  { roomId, code, onLeave }: { roomId: string; code: string; onLeave?: () => void },
+) {
   const view = useConnection(s => s.view) as ResultsView
   const labels = useConnection(s => s.labels)
   // Decided once per mount, but remembered for this room: a refresh
@@ -40,7 +42,10 @@ export function ResultsScreen({ roomId, onLeave }: { roomId: string; onLeave?: (
   const acts = actsFrom(view.winners, view.gallery, nameFor)
 
   if (!showOver && acts.length > 0) {
-    return <Catwalk acts={acts} onDone={() => { markShowSeen(roomId); setShowOver(true) }} />
+    return (
+      <Catwalk acts={acts} code={code}
+        onDone={() => { markShowSeen(roomId); setShowOver(true) }} />
+    )
   }
 
   return (
@@ -73,7 +78,7 @@ export function ResultsScreen({ roomId, onLeave }: { roomId: string; onLeave?: (
               {winner ? (
                 <>
                   {entry ? (
-                    <PumpkinThumb entry={entry} caption={nameFor(winner.slot)} />
+                    <PumpkinThumb entry={entry} code={code} caption={nameFor(winner.slot)} />
                   ) : (
                     // The award WAS decided; only its pumpkin is missing from
                     // the gallery. Never claim there were no votes.
@@ -100,6 +105,7 @@ export function ResultsScreen({ roomId, onLeave }: { roomId: string; onLeave?: (
             <PumpkinThumb
               key={entry.slot}
               entry={entry}
+              code={code}
               caption={nameFor(entry.slot)}
             />
           ))}

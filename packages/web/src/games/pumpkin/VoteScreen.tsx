@@ -7,7 +7,7 @@ import { PumpkinThumb } from './PumpkinThumb.js'
 import { VoteWaiting } from './VoteWaiting.js'
 import '../../theme/neon.css'
 
-export function VoteScreen() {
+export function VoteScreen({ code }: { code: string }) {
   const view = useConnection(s => s.view) as PumpkinView | null
   const dispatch = useConnection(s => s.dispatch)
   const [unsentAward, setUnsentAward] = useState<string | null>(null)
@@ -52,6 +52,7 @@ export function VoteScreen() {
             <PumpkinThumb
               key={entry.slot}
               entry={entry}
+              code={code}
               caption={isMine ? 'Yours' : undefined}
               selected={view.myVote === entry.slot}
               disabled={isMine}

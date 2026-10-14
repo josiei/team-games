@@ -1,6 +1,7 @@
 import { useEffect, useRef, type CSSProperties } from 'react'
 import { CANVAS_H, CANVAS_W, type GalleryEntry } from '@tg/shared'
 import { renderPumpkin } from './canvas.js'
+import { varietyFor } from './varieties.js'
 
 const THEME = { accent: '#FF7518', glow: '#FFC24D', bg: '#0E0D14' }
 
@@ -14,9 +15,11 @@ const INTEGRITY_TEXT = {
  * thumb is never dimmed unless asked.
  */
 export function PumpkinThumb({
-  entry, caption, selected, disabled, dimmed, onClick,
+  entry, code, caption, selected, disabled, dimmed, onClick,
 }: {
   entry: GalleryEntry
+  /** The room code: which pumpkin this slot was given is derived from it. */
+  code: string
   caption?: string | undefined
   selected?: boolean
   disabled?: boolean
@@ -28,7 +31,7 @@ export function PumpkinThumb({
   useEffect(() => {
     const ctx = ref.current?.getContext('2d')
     if (!ctx) return                   // jsdom has no 2D context; e2e covers rendering
-    renderPumpkin(ctx, entry.strokes, THEME)
+    renderPumpkin(ctx, entry.strokes, THEME, varietyFor(code, entry.slot))
     // Keyed on stable values, not `entry.strokes`: every snapshot is a fresh
     // JSON.parse, so the array identity changes though a submitted pumpkin's
     // strokes cannot. Re-rasterizing all thumbs on every vote is wasted work.

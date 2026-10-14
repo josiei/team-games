@@ -147,9 +147,13 @@ function Router() {
   if (view.kind === 'lobby') {
     return <Lobby code={asRoomCode(identity.code) as RoomCode} playerToken={identity.playerToken} onLeave={leave} />
   }
-  if (view.kind === 'carving') return <CarveScreen roomId={identity.roomId} />
-  if (view.kind === 'voting' || view.kind === 'spectator') return <VoteScreen />
-  if (view.kind === 'results') return <ResultsScreen roomId={identity.roomId} onLeave={leave} />
+  // The room code is the public salt every client shares, so each slot gets the
+  // same pumpkin on every screen without a field having to travel.
+  if (view.kind === 'carving') return <CarveScreen roomId={identity.roomId} code={identity.code} />
+  if (view.kind === 'voting' || view.kind === 'spectator') return <VoteScreen code={identity.code} />
+  if (view.kind === 'results') {
+    return <ResultsScreen roomId={identity.roomId} code={identity.code} onLeave={leave} />
+  }
   return <p>View: {(view as { kind: string }).kind}</p>
 }
 

@@ -8,6 +8,7 @@ import { Timer } from '../../ui/Timer.js'
 import { HostLine } from '../../ui/HostLine.js'
 import { IntegrityMeter } from './IntegrityMeter.js'
 import { PumpkinPainter } from './canvas.js'
+import { varietyFor } from './varieties.js'
 import {
   allStrokes, beginStroke, clearDraft, emptyDraft, endStroke,
   extendStroke, isFull, loadDraft, saveDraft, undo, type DraftState,
@@ -43,7 +44,7 @@ function LiveMeter({ register }: { register: { current: Setter | null } }) {
   return <IntegrityMeter ratio={ratio} integrity={integrityState(ratio, COLLAPSE_BASE)} />
 }
 
-export function CarveScreen({ roomId }: { roomId: string }) {
+export function CarveScreen({ roomId, code }: { roomId: string; code: string }) {
   const view = useConnection(s => s.view) as PumpkinView | null
   const dispatch = useConnection(s => s.dispatch)
   const endsAt = useConnection(s => s.endsAt)
@@ -101,8 +102,12 @@ export function CarveScreen({ roomId }: { roomId: string }) {
     if (ctx) {
       painterRef.current ??= new PumpkinPainter()
       if (rebuildRef.current) { painterRef.current.reset(); rebuildRef.current = false }
-      painterRef.current.sync(strokes, THEME)
-      painterRef.current.present(ctx, THEME)
+      // Read through the store rather than a captured value: paint() runs from
+      // an animation frame, long after the render that scheduled it.
+      const live = useConnection.getState().view as PumpkinView | null
+      const variety = varietyFor(code, live?.kind === 'carving' ? live.mySlot : 0)
+      painterRef.current.sync(strokes, THEME, variety)
+      painterRef.current.present(ctx, THEME, variety)
     }
     updateMeter()
     if (!fullRef.current && isFull(draft)) { fullRef.current = true; setFull(true) } // once, not per move

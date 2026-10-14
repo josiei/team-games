@@ -17,18 +17,18 @@ beforeEach(() => {
 
 describe('PumpkinThumb rasterization', () => {
   it('does not repaint when a structurally-equal, newly-parsed entry arrives', () => {
-    const { rerender } = render(<PumpkinThumb entry={entry()} />)
+    const { rerender } = render(<PumpkinThumb code="ROOM01" entry={entry()} />)
     expect(renderPumpkin).toHaveBeenCalledTimes(1)
     const next = entry()                                // fresh JSON.parse: new array identity
     expect(next.strokes).not.toBe(entry().strokes)
-    rerender(<PumpkinThumb entry={next} />)
-    rerender(<PumpkinThumb entry={entry()} />)
+    rerender(<PumpkinThumb code="ROOM01" entry={next} />)
+    rerender(<PumpkinThumb code="ROOM01" entry={entry()} />)
     expect(renderPumpkin).toHaveBeenCalledTimes(1)
   })
 
   it('repaints when the pumpkin really changes', () => {
-    const { rerender } = render(<PumpkinThumb entry={entry()} />)
-    rerender(<PumpkinThumb entry={entry({ integrity: 'collapsed' })} />)
+    const { rerender } = render(<PumpkinThumb code="ROOM01" entry={entry()} />)
+    rerender(<PumpkinThumb code="ROOM01" entry={entry({ integrity: 'collapsed' })} />)
     expect(renderPumpkin).toHaveBeenCalledTimes(2)
   })
 })

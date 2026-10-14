@@ -16,16 +16,26 @@ const GRADIENT = { addColorStop() {}, isGradient: true }
 function recordingContext() {
   const fills: Fill[] = []
   let pending: { x: number; y: number; r: number } | null = null
+  let clipped: { x: number; y: number; r: number } | null = null
   const ctx = {
     globalCompositeOperation: 'source-over',
     fillStyle: '' as unknown,
     strokeStyle: '' as unknown,
     lineWidth: 0, lineCap: '', lineJoin: '',
-    setTransform() {}, clearRect() {}, save() {}, restore() {}, clip() {},
-    stroke() {}, drawImage() {},
+    setTransform() {}, clearRect() {}, save() {}, restore() {}, stroke() {},
     createRadialGradient() { return GRADIENT },
     beginPath() { pending = null },
     arc(x: number, y: number, r: number) { pending = { x, y, r } },
+    // An uncarve clips to the brush and blits the untouched body back, so it
+    // is a clip+drawImage rather than a fill. Recorded as the same kind of
+    // event, so the ordering check still sees every op in sequence.
+    clip(path?: unknown) { if (path === undefined && pending) clipped = pending },
+    drawImage() {
+      if (clipped) {
+        fills.push({ op: 'source-over', style: 'PRISTINE', ...clipped })
+        clipped = null
+      }
+    },
     fill(path?: unknown) {
       if (path === undefined && pending) {
         fills.push({ op: ctx.globalCompositeOperation, style: ctx.fillStyle, ...pending })
@@ -92,15 +102,17 @@ describe('PumpkinPainter applies strokes in chronological order', () => {
   // alpha. Inheriting the body's shading (a gradient that is transparent in the
   // middle) left cuts barely cutting, and no screenshot of a static pumpkin
   // shows it — the body looked right and the carving simply stopped.
-  it('cuts with an opaque colour, never with the body shading', () => {
+  it('cuts with an opaque colour, and restores by putting the body back', () => {
     const strokes = [at('cut', 0.2), at('uncut', 0.2)]
     new PumpkinPainter().sync(strokes, THEME)
     const [cut, restore] = fake.fills
     expect(cut!.op).toBe('destination-out')
     expect(typeof cut!.style).toBe('string')
     expect(cut!.style).not.toBe(GRADIENT)
-    // and the restore paints the flesh back, shading included
-    expect(restore!.style).toBe(GRADIENT)
+    // An uncarve blits the untouched body, seams and shaded rim included.
+    // Filling it with the flesh gradient instead put a flat bright patch over
+    // the outer two thirds of the pumpkin, where the dark edge belongs.
+    expect(restore!.style).toBe('PRISTINE')
   })
 
   it('a stroke that grows between syncs paints only its new points', () => {

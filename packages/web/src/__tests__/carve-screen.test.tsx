@@ -65,7 +65,7 @@ afterEach(() => {
 
 describe('pointer ownership', () => {
   it('ignores a second pointer: it neither replaces nor extends the active stroke', () => {
-    render(<CarveScreen roomId="r1" />)
+    render(<CarveScreen code="ROOM01" roomId="r1" />)
     down(1, 100, 100)
     down(2, 400, 500)        // palm / second finger
     move(2, 410, 510)
@@ -81,7 +81,7 @@ describe('pointer ownership', () => {
   })
 
   it('ignores non-primary buttons', () => {
-    render(<CarveScreen roomId="r1" />)
+    render(<CarveScreen code="ROOM01" roomId="r1" />)
     down(1, 100, 100, 2)     // right click
     move(1, 200, 100)
     up(1)
@@ -92,7 +92,7 @@ describe('pointer ownership', () => {
   it('shows a visible cue and accepts no input once the pumpkin is full', () => {
     const full = Array.from({ length: 800 }, () => ({ tool: 'cut', size: 0.03, points: [[0.1, 0.1]] }))
     localStorage.setItem(KEY, JSON.stringify(full))
-    render(<CarveScreen roomId="r1" />)
+    render(<CarveScreen code="ROOM01" roomId="r1" />)
     down(1, 300, 300)
     expect(screen.getByRole('status').textContent).toMatch(/full/i)
     up(1)
@@ -105,7 +105,7 @@ describe('deadline and draft lifecycle', () => {
   it('auto-submits just before the deadline, including a stroke still in progress', () => {
     vi.useFakeTimers()
     useConnection.setState({ endsAt: Date.now() + 5000, clockOffset: 0 } as never)
-    render(<CarveScreen roomId="r1" />)
+    render(<CarveScreen code="ROOM01" roomId="r1" />)
     down(1, 100, 100)
     move(1, 160, 100)        // still holding the pointer when time runs out
     act(() => { vi.advanceTimersByTime(5000 - AUTO_SUBMIT_MARGIN_MS - 1) })
@@ -120,7 +120,7 @@ describe('deadline and draft lifecycle', () => {
   it('does not submit twice when the timer fires after a manual submit', () => {
     vi.useFakeTimers()
     useConnection.setState({ endsAt: Date.now() + 5000, clockOffset: 0 } as never)
-    render(<CarveScreen roomId="r1" />)
+    render(<CarveScreen code="ROOM01" roomId="r1" />)
     fireEvent.click(screen.getByText(/Submit pumpkin/))
     act(() => { vi.advanceTimersByTime(6000) })
     expect(sent('SUBMIT')).toHaveLength(1)
@@ -128,7 +128,7 @@ describe('deadline and draft lifecycle', () => {
 
   it('clears the stored draft when the view leaves carving', () => {
     localStorage.setItem(KEY, JSON.stringify([{ tool: 'cut', size: 0.1, points: [[0.5, 0.5]] }]))
-    render(<CarveScreen roomId="r1" />)
+    render(<CarveScreen code="ROOM01" roomId="r1" />)
     expect(localStorage.getItem(KEY)).not.toBeNull()
     act(() => { useConnection.setState({ view: { kind: 'lobby', playerCount: 3 } } as never) })
     expect(localStorage.getItem(KEY)).toBeNull()
@@ -136,14 +136,14 @@ describe('deadline and draft lifecycle', () => {
 
   it('keeps the draft when the screen unmounts while still carving (e.g. tab takeover)', () => {
     localStorage.setItem(KEY, JSON.stringify([{ tool: 'cut', size: 0.1, points: [[0.5, 0.5]] }]))
-    const { unmount } = render(<CarveScreen roomId="r1" />)
+    const { unmount } = render(<CarveScreen code="ROOM01" roomId="r1" />)
     unmount()
     expect(localStorage.getItem(KEY)).not.toBeNull()
   })
 
   it('sends DRAFT only when something changed since the last one', () => {
     vi.useFakeTimers()
-    render(<CarveScreen roomId="r1" />)
+    render(<CarveScreen code="ROOM01" roomId="r1" />)
     act(() => { vi.advanceTimersByTime(10_000) })
     expect(sent('DRAFT')).toHaveLength(0)         // nothing drawn, nothing sent
     down(1, 100, 100); up(1)
@@ -157,7 +157,7 @@ describe('deadline and draft lifecycle', () => {
 describe('dropped DRAFT and lost SUBMIT', () => {
   it('re-sends a DRAFT the socket dropped, instead of waiting for the next change', () => {
     vi.useFakeTimers()
-    render(<CarveScreen roomId="r1" />)
+    render(<CarveScreen code="ROOM01" roomId="r1" />)
     down(1, 100, 100); up(1)
     dispatch.mockReturnValue(false)
     act(() => { vi.advanceTimersByTime(10_000) })
@@ -170,7 +170,7 @@ describe('dropped DRAFT and lost SUBMIT', () => {
   })
 
   it('un-latches and resends when a snapshot still shows us as not submitted', () => {
-    render(<CarveScreen roomId="r1" />)
+    render(<CarveScreen code="ROOM01" roomId="r1" />)
     down(1, 100, 100); move(1, 160, 100); up(1)
     fireEvent.click(screen.getByText(/Submit pumpkin/))
     expect(sent('SUBMIT')).toHaveLength(1)          // dispatch said true; the socket then died
@@ -180,7 +180,7 @@ describe('dropped DRAFT and lost SUBMIT', () => {
   })
 
   it('does not resend once the server shows us as submitted', () => {
-    render(<CarveScreen roomId="r1" />)
+    render(<CarveScreen code="ROOM01" roomId="r1" />)
     down(1, 100, 100); up(1)
     fireEvent.click(screen.getByText(/Submit pumpkin/))
     act(() => { useConnection.setState({ view: { ...carvingView, submitted: true } } as never) })
@@ -193,7 +193,7 @@ describe('submit while the socket is down', () => {
   const draw = () => { down(1, 100, 100); move(1, 160, 100); up(1) }
 
   it('keeps the draft and leaves Submit usable when the send is dropped', () => {
-    render(<CarveScreen roomId="r1" />)
+    render(<CarveScreen code="ROOM01" roomId="r1" />)
     draw()
     act(() => { /* let the debounced local save run */ })
     dispatch.mockReturnValue(false)
@@ -209,7 +209,7 @@ describe('submit while the socket is down', () => {
 
   it('does not clear the stored draft when the send failed', () => {
     vi.useFakeTimers()
-    render(<CarveScreen roomId="r1" />)
+    render(<CarveScreen code="ROOM01" roomId="r1" />)
     draw()
     act(() => { vi.advanceTimersByTime(500) }) // debounced save
     expect(localStorage.getItem(KEY)).not.toBeNull()
@@ -222,7 +222,7 @@ describe('submit while the socket is down', () => {
     vi.useFakeTimers()
     useConnection.setState({ endsAt: Date.now() + 5000, clockOffset: 0, status: 'reconnecting' } as never)
     dispatch.mockReturnValue(false)
-    render(<CarveScreen roomId="r1" />)
+    render(<CarveScreen code="ROOM01" roomId="r1" />)
     draw()
     act(() => { vi.advanceTimersByTime(6000) })   // deadline passes while disconnected
     expect(sent('SUBMIT').length).toBeGreaterThan(0)
@@ -239,7 +239,7 @@ describe('submit while the socket is down', () => {
 describe('draft safety and live regions', () => {
   it('does not clear the draft for a transient null view', () => {
     localStorage.setItem(KEY, JSON.stringify([{ tool: 'cut', size: 0.1, points: [[0.5, 0.5]] }]))
-    render(<CarveScreen roomId="r1" />)
+    render(<CarveScreen code="ROOM01" roomId="r1" />)
     act(() => { useConnection.setState({ view: null } as never) })
     expect(localStorage.getItem(KEY)).not.toBeNull()
     act(() => { useConnection.setState({ view: carvingView } as never) })
@@ -247,7 +247,7 @@ describe('draft safety and live regions', () => {
   })
 
   it('keeps the status region mounted (empty) before it has anything to say', () => {
-    render(<CarveScreen roomId="r1" />)
+    render(<CarveScreen code="ROOM01" roomId="r1" />)
     expect(screen.getByRole('status').textContent).toBe('')
   })
 })
@@ -255,7 +255,7 @@ describe('draft safety and live regions', () => {
 describe('meter throttling', () => {
   it('recomputes carvedRatio at ~10Hz during a drag, and settles after it', () => {
     vi.useFakeTimers()
-    render(<CarveScreen roomId="r1" />)
+    render(<CarveScreen code="ROOM01" roomId="r1" />)
     const calls = () => vi.mocked(shared.carvedRatio).mock.calls.length
     const start = calls()
     down(1, 50, 50)

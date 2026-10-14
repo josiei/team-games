@@ -4,6 +4,7 @@ import {
   type AwardKey, type GalleryEntry,
 } from '@tg/shared'
 import { renderPumpkin } from './canvas.js'
+import { varietyFor } from './varieties.js'
 
 const THEME = { accent: '#FF7518', glow: '#FFC24D', bg: '#0E0D14' }
 
@@ -84,12 +85,12 @@ export function prefersReducedMotion(): boolean {
   return window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? true
 }
 
-function Walker({ act }: { act: Act }) {
+function Walker({ act, code }: { act: Act; code: string }) {
   const ref = useRef<HTMLCanvasElement>(null)
   useEffect(() => {
     const ctx = ref.current?.getContext('2d')
     if (!ctx) return                  // jsdom has no 2D context
-    renderPumpkin(ctx, act.entry.strokes, THEME)
+    renderPumpkin(ctx, act.entry.strokes, THEME, varietyFor(code, act.entry.slot))
     // Keyed on stable values, not the entry object: every snapshot is a fresh
     // JSON.parse, so a host line or a player dropping mid-act would otherwise
     // re-rasterize the walker underneath a running 3D composite.
@@ -114,7 +115,7 @@ function Walker({ act }: { act: Act }) {
  * in the same instant, so playing this locally keeps the room near enough in
  * step without a phase of its own in the protocol.
  */
-export function Catwalk({ acts, onDone }: { acts: Act[]; onDone(): void }) {
+export function Catwalk({ acts, code, onDone }: { acts: Act[]; code: string; onDone(): void }) {
   const [index, setIndex] = useState(0)
   const doneRef = useRef(onDone)
   doneRef.current = onDone
@@ -158,7 +159,7 @@ export function Catwalk({ acts, onDone }: { acts: Act[]; onDone(): void }) {
       <div className="catwalk-beam" key={`beam-${index}`} aria-hidden="true" />
 
       {/* Keyed on the act so every animation restarts for each walker. */}
-      <Walker key={index} act={act} />
+      <Walker key={index} act={act} code={code} />
 
       {/* Announced as each winner lands, so the show is not thirteen silent
           seconds for anyone listening rather than watching. */}

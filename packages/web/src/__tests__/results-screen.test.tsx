@@ -40,31 +40,31 @@ beforeEach(() => setView())
 
 describe('ResultsScreen', () => {
   it('names the winner of each decided award by its disambiguated label', () => {
-    render(<ResultsScreen roomId="room-1" />)
+    render(<ResultsScreen code="ROOM01" roomId="room-1" />)
     expect(card(/scariest/i).getByText('Jocelyn')).toBeTruthy()
     expect(card(/craftsmanship/i).getByText('Jocelyn (2)')).toBeTruthy()
   })
 
   it('shows the vote count for a decided award', () => {
-    render(<ResultsScreen roomId="room-1" />)
+    render(<ResultsScreen code="ROOM01" roomId="room-1" />)
     expect(card(/scariest/i).getByText(/2 votes/i)).toBeTruthy()
   })
 
   it('says no votes were cast for an award nobody voted on', () => {
-    render(<ResultsScreen roomId="room-1" />)
+    render(<ResultsScreen code="ROOM01" roomId="room-1" />)
     expect(screen.getAllByText(/no votes cast/i).length).toBe(2)
     expect(card(/funniest/i).getByText(/no votes cast/i)).toBeTruthy()
   })
 
   it('uses the singular for a one-vote win', () => {
-    render(<ResultsScreen roomId="room-1" />)
+    render(<ResultsScreen code="ROOM01" roomId="room-1" />)
     expect(card(/craftsmanship/i).getByText(/1 vote\b/i)).toBeTruthy()
     expect(screen.queryByText(/1 votes/i)).toBeNull()
   })
 
   it('reveals the carver under every pumpkin, not only winners', () => {
     setView({ gallery: [entry(0), entry(1), entry(2)], carvers: { 0: ME, 1: OTHER, 2: OTHER } })
-    render(<ResultsScreen roomId="room-1" />)
+    render(<ResultsScreen code="ROOM01" roomId="room-1" />)
     const thumbs = gallery().getAllByRole('img', { name: /pumpkin/i })
     expect(thumbs).toHaveLength(3)
     expect(thumbs.map(b => b.textContent)).toEqual(['Jocelyn', 'Jocelyn (2)', 'Jocelyn (2)'])
@@ -82,19 +82,19 @@ describe('ResultsScreen', () => {
 
   it('does not crash when a winning slot has no carver recorded', () => {
     setView({ carvers: {} })
-    expect(() => render(<ResultsScreen roomId="room-1" />)).not.toThrow()
+    expect(() => render(<ResultsScreen code="ROOM01" roomId="room-1" />)).not.toThrow()
     expect(card(/scariest/i).getByText(/unknown carver/i)).toBeTruthy()
   })
 
   it('falls back when the carver has no label', () => {
     setView({ carvers: { 0: asPlayerId('ghost'), 1: OTHER } })
-    render(<ResultsScreen roomId="room-1" />)
+    render(<ResultsScreen code="ROOM01" roomId="room-1" />)
     expect(card(/scariest/i).getByText(/unknown carver/i)).toBeTruthy()
   })
 
   it('renders all four award headings even when undecided', () => {
     setView({ winners: { scariest: null, funniest: null, craft: null, cursed: null } })
-    render(<ResultsScreen roomId="room-1" />)
+    render(<ResultsScreen code="ROOM01" roomId="room-1" />)
     for (const name of [/scariest/i, /funniest/i, /craftsmanship/i, /cursed/i]) {
       expect(screen.getByRole('heading', { name })).toBeTruthy()
     }
@@ -105,7 +105,7 @@ describe('ResultsScreen', () => {
 
   it('does not claim "No votes cast" for a winner whose pumpkin is missing from the gallery', () => {
     setView({ gallery: [entry(1)] }) // scariest won slot 0 with 2 votes; slot 0 is absent
-    render(<ResultsScreen roomId="room-1" />)
+    render(<ResultsScreen code="ROOM01" roomId="room-1" />)
     const scariest = card(/scariest/i)
     expect(scariest.getByText(/2 votes/i)).toBeTruthy()
     expect(scariest.queryByText(/no votes cast/i)).toBeNull()
@@ -114,7 +114,7 @@ describe('ResultsScreen', () => {
 
   it('treats a blank label as missing', () => {
     useConnection.setState({ labels: { me: '  ', other: 'Jocelyn (2)' } })
-    render(<ResultsScreen roomId="room-1" />)
+    render(<ResultsScreen code="ROOM01" roomId="room-1" />)
     expect(card(/scariest/i).getByText(/unknown carver/i)).toBeTruthy()
   })
 })
@@ -131,7 +131,7 @@ describe('ResultsScreen reveal gate', () => {
     allowMotion()
     vi.useFakeTimers()
     setView()
-    render(<ResultsScreen roomId="room-1" />)
+    render(<ResultsScreen code="ROOM01" roomId="room-1" />)
 
     expect(screen.getByLabelText('Awards reveal')).toBeTruthy()
     expect(screen.queryByRole('group', { name: /Scariest/ })).toBeNull()
@@ -147,12 +147,12 @@ describe('ResultsScreen reveal gate', () => {
     // seconds with no skip control would lock them out of their own results.
     allowMotion()
     setView()
-    const first = render(<ResultsScreen roomId="room-1" />)
+    const first = render(<ResultsScreen code="ROOM01" roomId="room-1" />)
     expect(screen.getByLabelText('Awards reveal')).toBeTruthy()
     act(() => { markShowSeen('room-1') })
     first.unmount()
 
-    render(<ResultsScreen roomId="room-1" />)
+    render(<ResultsScreen code="ROOM01" roomId="room-1" />)
     expect(screen.queryByLabelText('Awards reveal')).toBeNull()
     expect(screen.getByRole('group', { name: /Scariest/ })).toBeTruthy()
   })
@@ -164,14 +164,14 @@ describe('ResultsScreen reveal gate', () => {
     allowMotion()
     markShowSeen('room-0')
     setView()
-    render(<ResultsScreen roomId="room-1" />)
+    render(<ResultsScreen code="ROOM01" roomId="room-1" />)
     expect(screen.getByLabelText('Awards reveal')).toBeTruthy()
   })
 
   it('skips the show entirely when the system asks for less motion', () => {
     vi.stubGlobal('matchMedia', () => ({ matches: true }))
     setView()
-    render(<ResultsScreen roomId="room-1" />)
+    render(<ResultsScreen code="ROOM01" roomId="room-1" />)
     expect(screen.queryByLabelText('Awards reveal')).toBeNull()
     expect(screen.getByRole('group', { name: /Scariest/ })).toBeTruthy()
   })
@@ -185,7 +185,7 @@ describe('leaving a finished game', () => {
     // this the only escape from a finished room is clearing storage.
     const onLeave = vi.fn()
     setView()
-    render(<ResultsScreen roomId="room-1" onLeave={onLeave} />)
+    render(<ResultsScreen code="ROOM01" roomId="room-1" onLeave={onLeave} />)
     screen.getByRole('button', { name: /back to the start/i }).click()
     expect(onLeave).toHaveBeenCalledTimes(1)
   })
