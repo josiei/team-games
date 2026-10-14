@@ -95,7 +95,7 @@ function Walker({ act, code }: { act: Act; code: string }) {
     // JSON.parse, so a host line or a player dropping mid-act would otherwise
     // re-rasterize the walker underneath a running 3D composite.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [act.entry.slot, act.entry.strokes.length, act.entry.integrity])
+  }, [code, act.entry.slot, act.entry.strokes.length, act.entry.integrity])
 
   return (
     <div className="walker">

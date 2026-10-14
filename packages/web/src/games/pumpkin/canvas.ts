@@ -1,6 +1,12 @@
 import { CANVAS_H, CANVAS_W, type Stroke } from '@tg/shared'
 import { VARIETIES, bodyFor, lobesFor, type Body, type Variety } from './varieties.js'
 
+/**
+ * Every renderer here takes its variety EXPLICITLY. It used to default to this
+ * one, which is the worst available behaviour for a forgotten argument: a
+ * screen that quietly drew classic while every other screen drew the player's
+ * real pumpkin. A required parameter makes that a compile error instead.
+ */
 export const DEFAULT_VARIETY: Variety = VARIETIES[0]!
 
 /**
@@ -8,7 +14,7 @@ export const DEFAULT_VARIETY: Variety = VARIETIES[0]!
  * is also what stops you carving the background.
  */
 const silhouettes = new Map<string, Path2D>()
-export function pumpkinPath(variety: Variety = DEFAULT_VARIETY): Path2D {
+export function pumpkinPath(variety: Variety): Path2D {
   const hit = silhouettes.get(variety.name)
   if (hit) return hit
   const body = bodyFor(variety)
@@ -25,27 +31,61 @@ export function pumpkinPath(variety: Variety = DEFAULT_VARIETY): Path2D {
   return path
 }
 
-/** Where an unreadable colour lands: visibly wrong, rather than not rendering. */
+/** The flesh of last resort: visibly wrong, rather than not rendering at all. */
 export const FALLBACK_SKIN = '#8A8A8A'
 
 /**
- * Mixes a hex colour toward white (amount > 0) or black (amount < 0), so the
+ * Mixes a colour toward white (amount > 0) or black (amount < 0), so the
  * shading follows whatever accent a game hands us instead of hard-coding
- * orange. Anything it cannot parse becomes grey: the result goes straight into
- * `addColorStop`, which THROWS on a colour it cannot read — from the carve
- * screen's animation frame that means a blank canvas every frame, where the
- * old flat fill merely ignored the value. A grey pumpkin is debuggable; a
- * blank one is not.
+ * orange.
+ *
+ * Every hex form is understood — #rgb, #rgba, #rrggbb, #rrggbbaa — and
+ * anything else is passed through UNMIXED rather than replaced. It used to
+ * return grey for everything the hex pattern missed, which meant `orange`,
+ * `#fff` and `rgb(1,2,3)` — all colours a canvas reads perfectly well — came
+ * out grey. Flat-but-right beats shaded-but-grey.
+ *
+ * A colour the platform genuinely cannot read still has to be caught, because
+ * `addColorStop` THROWS on one and that is a blank canvas on every animation
+ * frame. That is now handled where the throw happens, by `gradientOr`, which
+ * is the only place that can tell an unreadable colour from an unfamiliar one.
  */
 export function shade(hex: string, amount: number): string {
-  const match = /^#([0-9a-f]{6})$/i.exec(hex.trim())
-  if (!match) return FALLBACK_SKIN
-  const n = parseInt(match[1]!, 16)
+  const raw = hex.trim()
+  const m = /^#([0-9a-f]{3,8})$/i.exec(raw)
+  const digits = m?.[1]?.length
+  if (!m || (digits !== 3 && digits !== 4 && digits !== 6 && digits !== 8)) return raw
+  const short = digits < 6
+  const hexOf = (i: number) => (short
+    ? m[1]!.slice(i, i + 1).repeat(2)
+    : m[1]!.slice(i * 2, i * 2 + 2))
+  const channel = (i: number) => parseInt(hexOf(i), 16)
   const towards = amount >= 0 ? 255 : 0
   const t = Math.min(1, Math.abs(amount))
-  const mix = (channel: number) => Math.round(channel + (towards - channel) * t)
-  const r = mix((n >> 16) & 0xff), g = mix((n >> 8) & 0xff), b = mix(n & 0xff)
-  return `#${((1 << 24) | (r << 16) | (g << 8) | b).toString(16).slice(1)}`
+  const mix = (c: number) => Math.round(c + (towards - c) * t)
+  const pair = (c: number) => c.toString(16).padStart(2, '0')
+  const alpha = digits === 4 || digits === 8 ? pair(channel(3)) : ''
+  return `#${pair(mix(channel(0)))}${pair(mix(channel(1)))}${pair(mix(channel(2)))}${alpha}`
+}
+
+/**
+ * Builds a gradient, or returns null if any of its stops is a colour this
+ * platform cannot read. `addColorStop` throws on one, and every gradient here
+ * is built from a caller-supplied theme inside a render that runs per frame —
+ * so an unreadable accent has to degrade to a flat fill once, not take the
+ * whole canvas down sixty times a second.
+ */
+export function gradientOr(
+  build: () => CanvasGradient,
+  stops: readonly [number, string][],
+): CanvasGradient | null {
+  try {
+    const gradient = build()
+    for (const [at, colour] of stops) gradient.addColorStop(at, colour)
+    return gradient
+  } catch {
+    return null
+  }
 }
 
 /** Where the seams fall: between each pair of neighbouring lobes. */
@@ -163,6 +203,23 @@ export type Theme = { accent: string; glow: string; bg: string }
  */
 export const CUT_PAINT = '#000'
 
+/**
+ * How much wider than its brush an uncarve blits, in pixels.
+ *
+ * A cut is an ANTIALIASED fill, so it leaves the pixels at its own perimeter
+ * partly removed — measured: alpha 246 of 255 at exactly r. A `clip()` to the
+ * same radius does not cover those pixels, so the blit could not reach them
+ * and a faint bright ring of candle glow stayed behind, which a second uncarve
+ * of the same spot could not clear either. One pixel of padding covers the
+ * fringe; the overshoot lands on flesh that is already pristine, where putting
+ * the body back is a no-op, so the result is exact rather than merely closer.
+ *
+ * (Three blits through the unpadded clip were tried first. They changed
+ * nothing, which is what proved the missing pixels were outside the clip
+ * rather than under-painted inside it.)
+ */
+export const RESTORE_PAD = 1.5
+
 /** One pixel-level operation. `cut` punches flesh out; `restore` paints it back. */
 export type Op = {
   kind: 'cut' | 'restore'
@@ -181,6 +238,8 @@ export type Op = {
 export function strokeOps(stroke: Stroke, from = 0): Op[] {
   const r = (stroke.size * CANVAS_W) / 2
   const kind = stroke.tool === 'uncut' ? 'restore' : 'cut'
+  // Only a stamp carries a shape, and a stamp is always a cut — so a `restore`
+  // op's shape is always undefined. The painter relies on that.
   const shape = stroke.tool === 'stamp' ? stroke.shape : undefined
   const ops: Op[] = []
   for (let i = from; i < stroke.points.length; i++) {
@@ -211,9 +270,6 @@ export class PumpkinPainter {
     this.bctx = null
   }
 
-  /** Only for tests: the untouched body an uncarve blits from. */
-  get pristineBody(): HTMLCanvasElement | null { return this.pristine }
-
   private ensure(theme: Theme, variety: Variety): CanvasRenderingContext2D | null {
     if (this.bctx && this.accent === theme.accent && this.variety === variety.name) return this.bctx
     if (!this.canvas) {
@@ -238,13 +294,15 @@ export class PumpkinPainter {
 
     // Lit from up and to the left. A flat fill is most of why this read as a
     // ball rather than a gourd.
-    const body = bctx.createRadialGradient(
-      geo.cx - geo.rx * 0.35, geo.cy - geo.ry * 0.45, geo.rx * 0.1,
-      geo.cx, geo.cy, geo.rx * 1.15)
-    body.addColorStop(0, shade(skin, 0.28))
-    body.addColorStop(0.55, skin)
-    body.addColorStop(1, shade(skin, -0.35))
-    bctx.fillStyle = body
+    const body = gradientOr(
+      () => bctx.createRadialGradient(
+        geo.cx - geo.rx * 0.35, geo.cy - geo.ry * 0.45, geo.rx * 0.1,
+        geo.cx, geo.cy, geo.rx * 1.15),
+      [[0, shade(skin, 0.28)], [0.55, skin], [1, shade(skin, -0.35)]],
+    )
+    // Grey only when the accent is genuinely unreadable — decided by the
+    // canvas, not by a pattern match.
+    bctx.fillStyle = body ?? FALLBACK_SKIN
     bctx.fill(path)
 
     // Clip once, for good: every later op is confined to the silhouette, so
@@ -264,12 +322,11 @@ export class PumpkinPainter {
     // A darker edge, so the body turns away rather than stopping flat. Painted
     // as a vignette rather than stroked: the path is several lobes, and
     // stroking it would trace every one of them across the face.
-    const rim = bctx.createRadialGradient(
-      geo.cx, geo.cy, geo.rx * 0.62, geo.cx, geo.cy, geo.rx)
-    rim.addColorStop(0, 'rgba(0,0,0,0)')
-    rim.addColorStop(1, 'rgba(0,0,0,0.38)')
-    bctx.fillStyle = rim
-    bctx.fill(path)
+    const rim = gradientOr(
+      () => bctx.createRadialGradient(geo.cx, geo.cy, geo.rx * 0.62, geo.cx, geo.cy, geo.rx),
+      [[0, 'rgba(0,0,0,0)'], [1, 'rgba(0,0,0,0.38)']],
+    )
+    if (rim) { bctx.fillStyle = rim; bctx.fill(path) }
 
     // Keep a copy of the finished body. An uncarve blits from this, so it puts
     // the seams and the shaded edge back rather than a flat patch of flesh.
@@ -289,26 +346,18 @@ export class PumpkinPainter {
   }
 
   /** Apply any points not yet painted. Safe to call every frame. */
-  sync(strokes: Stroke[], theme: Theme, variety: Variety = DEFAULT_VARIETY): void {
+  sync(strokes: Stroke[], theme: Theme, variety: Variety): void {
     const bctx = this.ensure(theme, variety)
     if (!bctx) return
     for (const stroke of strokes) {
       const from = this.painted.get(stroke) ?? 0
       if (from >= stroke.points.length) continue
       for (const op of strokeOps(stroke, from)) {
-        if (op.kind === 'restore' && this.pristine) {
-          // Put the original body back through the brush, shading and all.
-          bctx.save()
-          bctx.globalCompositeOperation = 'source-over'
-          if (op.shape) {
-            bctx.clip(stampPath(op.shape, op.x, op.y, op.r))
-          } else {
-            bctx.beginPath()
-            bctx.arc(op.x, op.y, op.r, 0, Math.PI * 2)
-            bctx.clip()
-          }
-          bctx.drawImage(this.pristine, 0, 0)
-          bctx.restore()
+        // Checked BEFORE `pristine`, so a missing snapshot can only make an
+        // uncarve do nothing. Sharing the fall-through with the cut below
+        // would have turned it into a cut — the one wrong way to fail here.
+        if (op.kind === 'restore') {
+          if (this.pristine) this.restoreThrough(bctx, op)
           continue
         }
         bctx.globalCompositeOperation = 'destination-out'
@@ -325,20 +374,43 @@ export class PumpkinPainter {
     }
   }
 
+  /**
+   * Puts the original body back through the brush, shading and all — padded by
+   * `RESTORE_PAD` so it also reaches the cut's antialiased perimeter.
+   *
+   * Stays INSIDE the silhouette clip. Stepping outside it was tried, to stop
+   * the rim's own antialiased coverage being applied a second time; it made
+   * things worse, because source-over then adds that coverage to the copy
+   * already there and the edge comes back more opaque than it started.
+   * Clipped undershoots the rim by at most 16 of 255 on a couple of dozen
+   * pixels; unclipped overshoots it by up to 36 on four times as many.
+   */
+  private restoreThrough(bctx: CanvasRenderingContext2D, op: Op): void {
+    if (!this.pristine) return
+    bctx.save()
+    bctx.globalCompositeOperation = 'source-over'
+    bctx.beginPath()
+    bctx.arc(op.x, op.y, op.r + RESTORE_PAD, 0, Math.PI * 2)
+    bctx.clip()
+    bctx.drawImage(this.pristine, 0, 0)
+    bctx.restore()
+  }
+
   /** Candle glow beneath, pumpkin body above, onto the visible canvas. */
-  present(ctx: CanvasRenderingContext2D, theme: Theme, variety: Variety = DEFAULT_VARIETY): void {
+  present(ctx: CanvasRenderingContext2D, theme: Theme, variety: Variety): void {
     const geo = bodyFor(variety)
     // The context belongs to the caller: leave its paint, line settings and
     // composite mode exactly as they were found.
     ctx.save()
     ctx.globalCompositeOperation = 'source-over'
     ctx.clearRect(0, 0, CANVAS_W, CANVAS_H)
-    const glow = ctx.createRadialGradient(
-      geo.cx, geo.cy, 10, geo.cx, geo.cy, geo.rx * 1.05)
-    glow.addColorStop(0, '#FFFFFF')
-    glow.addColorStop(0.35, theme.glow)
-    glow.addColorStop(1, theme.bg)
-    ctx.fillStyle = glow
+    // `theme.glow` and `theme.bg` reach addColorStop untouched, so they carry
+    // the same throw risk as the accent and get the same treatment.
+    const glow = gradientOr(
+      () => ctx.createRadialGradient(geo.cx, geo.cy, 10, geo.cx, geo.cy, geo.rx * 1.05),
+      [[0, '#FFFFFF'], [0.35, theme.glow], [1, theme.bg]],
+    )
+    ctx.fillStyle = glow ?? FALLBACK_SKIN
     ctx.fill(pumpkinPath(variety))
     // Under the body, so the body's top edge overlaps its base and it reads as
     // planted in the pumpkin rather than balanced on it.
@@ -355,7 +427,7 @@ export function renderPumpkin(
   ctx: CanvasRenderingContext2D,
   strokes: Stroke[],
   theme: Theme,
-  variety: Variety = DEFAULT_VARIETY,
+  variety: Variety,
 ): void {
   scratch ??= new PumpkinPainter()
   scratch.reset()

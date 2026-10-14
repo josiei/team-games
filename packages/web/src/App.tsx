@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { asRoomCode, type PumpkinView, type RoomCode } from '@tg/shared'
+import { asRoomCode, normalizeCode, type PumpkinView, type RoomCode } from '@tg/shared'
 import { useConnection } from './store/connection.js'
 import { JoinScreen } from './lobby/JoinScreen.js'
 import { Lobby } from './lobby/Lobby.js'
@@ -119,7 +119,13 @@ function Router() {
       <JoinScreen
         onJoined={(code, join, displayName) => {
           const next = {
-            code: asRoomCode(code) as string, roomId: join.roomId, playerId: join.playerId,
+            // NORMALIZED here, not just on the wire. `asRoomCode` is a type cast
+            // with no runtime effect, and the code is the public salt every
+            // screen derives its pumpkins from: a guest who types `AB2-CD3`
+            // (the input allows the hyphen) joins the right room through
+            // `normalizeCode` in the api layer, but would then salt with the
+            // hyphen and see every pumpkin in the room as the wrong shape.
+            code: normalizeCode(code) as string, roomId: join.roomId, playerId: join.playerId,
             playerToken: join.playerToken, displayName,
           }
           saveSession(next)

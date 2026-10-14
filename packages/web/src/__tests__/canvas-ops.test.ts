@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { CANVAS_H, CANVAS_W, carvedRatio, type Stroke } from '@tg/shared'
-import { PumpkinPainter, strokeOps } from '../games/pumpkin/canvas.js'
+import { DEFAULT_VARIETY, PumpkinPainter, RESTORE_PAD, strokeOps } from '../games/pumpkin/canvas.js'
 
 // jsdom has no 2D context, so rasterization is covered by the Playwright test.
 // What IS pinnable here is ORDER: the painter must apply strokes to the canvas
@@ -17,12 +17,17 @@ function recordingContext() {
   const fills: Fill[] = []
   let pending: { x: number; y: number; r: number } | null = null
   let clipped: { x: number; y: number; r: number } | null = null
+  let recorded = false
+  let blits = 0
   const ctx = {
     globalCompositeOperation: 'source-over',
     fillStyle: '' as unknown,
     strokeStyle: '' as unknown,
     lineWidth: 0, lineCap: '', lineJoin: '',
-    setTransform() {}, clearRect() {}, save() {}, restore() {}, stroke() {},
+    setTransform() {}, clearRect() {}, stroke() {},
+    save() {},
+    // Leaving the clip in place after a restore would mis-attribute later blits.
+    restore() { clipped = null; recorded = false },
     createRadialGradient() { return GRADIENT },
     beginPath() { pending = null },
     arc(x: number, y: number, r: number) { pending = { x, y, r } },
@@ -31,9 +36,13 @@ function recordingContext() {
     // event, so the ordering check still sees every op in sequence.
     clip(path?: unknown) { if (path === undefined && pending) clipped = pending },
     drawImage() {
-      if (clipped) {
+      // Only counts blits made THROUGH a brush clip: `ensure()` also blits, to
+      // snapshot the pristine body, and that one is not a restore.
+      if (!clipped) return
+      blits++
+      if (!recorded) {
         fills.push({ op: 'source-over', style: 'PRISTINE', ...clipped })
-        clipped = null
+        recorded = true
       }
     },
     fill(path?: unknown) {
@@ -42,7 +51,7 @@ function recordingContext() {
       }
     },
   }
-  return { ctx, fills }
+  return { ctx, fills, blits: () => blits }
 }
 
 const toStrokes = (fills: Fill[]): Stroke[] => fills.map(f => ({
@@ -72,7 +81,7 @@ describe('PumpkinPainter applies strokes in chronological order', () => {
       expect(expected).toBeGreaterThan(0)
 
       const painter = new PumpkinPainter()
-      painter.sync(strokes, THEME)
+      painter.sync(strokes, THEME, DEFAULT_VARIETY)
       expect(fake.fills.map(f => f.op)).toEqual(['destination-out', 'source-over', 'destination-out'])
       expect(carvedRatio(toStrokes(fake.fills))).toBe(expected)
     })
@@ -80,20 +89,20 @@ describe('PumpkinPainter applies strokes in chronological order', () => {
     it(`incremental sync and a reset replay agree (brush ${size})`, () => {
       const strokes = [at('cut', size), at('uncut', size), at('cut', size)]
       const incremental = new PumpkinPainter()
-      for (let n = 1; n <= strokes.length; n++) incremental.sync(strokes.slice(0, n), THEME)
+      for (let n = 1; n <= strokes.length; n++) incremental.sync(strokes.slice(0, n), THEME, DEFAULT_VARIETY)
       const incrementalFills = [...fake.fills]
       expect(incrementalFills).toHaveLength(3) // each stroke applied exactly once
 
       fake.fills.length = 0
       incremental.reset()
-      incremental.sync(strokes, THEME)
+      incremental.sync(strokes, THEME, DEFAULT_VARIETY)
       expect(fake.fills).toEqual(incrementalFills)
     })
   }
 
   it('cut -> uncut leaves it restored, matching carvedRatio', () => {
     const strokes = [at('cut', 0.2), at('uncut', 0.2)]
-    new PumpkinPainter().sync(strokes, THEME)
+    new PumpkinPainter().sync(strokes, THEME, DEFAULT_VARIETY)
     expect(carvedRatio(toStrokes(fake.fills))).toBe(carvedRatio(strokes))
     expect(carvedRatio(strokes)).toBe(0)
   })
@@ -104,7 +113,7 @@ describe('PumpkinPainter applies strokes in chronological order', () => {
   // shows it — the body looked right and the carving simply stopped.
   it('cuts with an opaque colour, and restores by putting the body back', () => {
     const strokes = [at('cut', 0.2), at('uncut', 0.2)]
-    new PumpkinPainter().sync(strokes, THEME)
+    new PumpkinPainter().sync(strokes, THEME, DEFAULT_VARIETY)
     const [cut, restore] = fake.fills
     expect(cut!.op).toBe('destination-out')
     expect(typeof cut!.style).toBe('string')
@@ -115,13 +124,31 @@ describe('PumpkinPainter applies strokes in chronological order', () => {
     expect(restore!.style).toBe('PRISTINE')
   })
 
+  /**
+   * An unpadded uncarve left a bright 1px ring on the brush perimeter, which no
+   * number of extra blits could clear: a cut is an antialiased fill, so the
+   * pixels AT its radius are only partly removed, and a clip to that same
+   * radius does not cover them. Measured in a real canvas: 254 differing
+   * pixels at up to 63/255 before the padding, zero after it.
+   */
+  it("blits the body back wider than the brush, to cover the cut's antialiased edge", () => {
+    const size = 0.2
+    new PumpkinPainter().sync([at('cut', size), at('uncut', size)], THEME, DEFAULT_VARIETY)
+    const [cut, restore] = fake.fills
+    expect(RESTORE_PAD).toBeGreaterThan(0)
+    expect(restore!.r).toBeCloseTo(cut!.r + RESTORE_PAD, 6)
+    // Only by the padding, though: a restore that grew with the brush would
+    // start eating neighbouring cuts the meter still counts.
+    expect(restore!.r - cut!.r).toBeLessThan(2)
+  })
+
   it('a stroke that grows between syncs paints only its new points', () => {
     const s: Stroke = { tool: 'cut', size: 0.1, points: [[0.2, 0.2]] }
     const painter = new PumpkinPainter()
-    painter.sync([s], THEME)
+    painter.sync([s], THEME, DEFAULT_VARIETY)
     s.points.push([0.3, 0.3], [0.4, 0.4])
-    painter.sync([s], THEME)
-    painter.sync([s], THEME)
+    painter.sync([s], THEME, DEFAULT_VARIETY)
+    painter.sync([s], THEME, DEFAULT_VARIETY)
     expect(fake.fills).toHaveLength(3)
   })
 })

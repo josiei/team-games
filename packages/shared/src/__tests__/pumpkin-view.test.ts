@@ -52,6 +52,30 @@ describe('viewFor during carving', () => {
     expect(view.integrity).toBe('collapsed')
     expect(view.ratio).toBeGreaterThan(0.5)
   })
+  /**
+   * The carving view was unpinned while the voting view was not, which is the
+   * wrong way round for the view that knows who you are: `mySlot` was added
+   * here with no test at all, and an owner-shaped field added next to it would
+   * not have been caught the way one in the voting view would.
+   */
+  it('pins the exact top-level key set of the carving view', () => {
+    const view = viewFor(setPhase(createState(players, 7), 'carving'), A)
+    expect(Object.keys(view).sort()).toEqual(
+      ['integrity', 'kind', 'mySlot', 'myStrokes', 'ratio', 'submitted', 'submittedCount', 'totalPlayers'])
+  })
+
+  it('tells a carver their own slot, so their screen draws their own pumpkin', () => {
+    const s = setPhase(createState(players, 7), 'carving')
+    for (const viewer of [A, B, C]) {
+      const view = viewFor(s, viewer)
+      if (view.kind !== 'carving') throw new Error('wrong view')
+      expect(view.mySlot).toBe(slotOf(s, viewer))
+      expect(view.mySlot).toBeGreaterThanOrEqual(0)
+    }
+    // Distinct, so nobody is handed somebody else's pumpkin to carve.
+    const slots = [A, B, C].map(v => (viewFor(s, v) as { mySlot: number }).mySlot)
+    expect(new Set(slots).size).toBe(3)
+  })
 })
 
 describe('viewFor during voting', () => {

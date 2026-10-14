@@ -4,6 +4,8 @@
  * guarded: storage throws in some private-browsing modes, and a storage
  * failure must degrade to the ordinary join form, never break the app.
  */
+import { normalizeCode } from '@tg/shared'
+
 export const SESSION_KEY = 'tg.session'
 
 export type StoredSession = {
@@ -23,7 +25,7 @@ export function loadSession(): StoredSession | null {
       s && typeof s.code === 'string' && typeof s.roomId === 'string' &&
       typeof s.playerId === 'string' && typeof s.playerToken === 'string' &&
       typeof s.displayName === 'string'
-    ) return s as StoredSession
+    ) return { ...s, code: normalizeCode(s.code) as string } as StoredSession
     return null
   } catch { return null }
 }

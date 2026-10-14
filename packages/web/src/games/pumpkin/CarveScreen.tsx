@@ -93,6 +93,9 @@ export function CarveScreen({ roomId, code }: { roomId: string; code: string }) 
     else meterTimerRef.current = setTimeout(run, wait)
   }
 
+  /** The slot whose pumpkin we are drawing, held across view changes. */
+  const slotRef = useRef<number | null>(null)
+
   /** Paint now: new points onto the canvas plus the meter. Never sets CarveScreen state per move. */
   const paint = () => {
     frameRef.current = 0
@@ -103,9 +106,16 @@ export function CarveScreen({ roomId, code }: { roomId: string; code: string }) 
       painterRef.current ??= new PumpkinPainter()
       if (rebuildRef.current) { painterRef.current.reset(); rebuildRef.current = false }
       // Read through the store rather than a captured value: paint() runs from
-      // an animation frame, long after the render that scheduled it.
+      // an animation frame, long after the render that scheduled it. Which
+      // means the view can have moved on by the time the frame lands — so the
+      // slot is REMEMBERED. Falling back to 0 painted slot zero's pumpkin,
+      // which is somebody else's five times out of six, and `ensure()` would
+      // then replay every stroke onto a differently shaped body.
       const live = useConnection.getState().view as PumpkinView | null
-      const variety = varietyFor(code, live?.kind === 'carving' ? live.mySlot : 0)
+      if (live?.kind === 'carving' && Number.isInteger(live.mySlot) && live.mySlot >= 0) {
+        slotRef.current = live.mySlot
+      }
+      const variety = varietyFor(code, slotRef.current ?? 0)
       painterRef.current.sync(strokes, THEME, variety)
       painterRef.current.present(ctx, THEME, variety)
     }

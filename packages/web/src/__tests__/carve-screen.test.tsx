@@ -31,6 +31,8 @@ class TestPointerEvent extends MouseEvent {
 const carvingView = {
   kind: 'carving', myStrokes: [], submitted: false, ratio: 0, integrity: 'solid',
   submittedCount: 0, totalPlayers: 3,
+  // Real views carry this; the screen reads it to pick which pumpkin is yours.
+  mySlot: 1,
 }
 const KEY = 'tg:draft:r1'
 

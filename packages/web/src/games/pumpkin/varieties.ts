@@ -29,7 +29,7 @@ export type Variety = {
  * measures cut area against the whole canvas rather than against the pumpkin,
  * so a genuinely smaller body would mean more of its owner's carving landed
  * outside it — invisible, but still counting toward collapse. Equal areas keep
- * the gamble the same for everyone. `varieties.test.ts` holds the line.
+ * the gamble the same for everyone. `pumpkin-art.test.ts` holds the line.
  */
 export const VARIETIES: readonly Variety[] = [
   { name: 'classic', lobes: 5, m: 1, scallop: 0.88, stem: 0, tint: 0 },
@@ -100,5 +100,7 @@ export function varietyFor(roomCode: string, slot: number): Variety {
   h ^= h >>> 15
   h = Math.imul(h, 2246822507) >>> 0
   h ^= h >>> 13
+  // The index is always in range; the `??` is what `noUncheckedIndexedAccess`
+  // requires to turn `Variety | undefined` into `Variety`.
   return VARIETIES[(h >>> 0) % VARIETIES.length] ?? VARIETIES[0]!
 }

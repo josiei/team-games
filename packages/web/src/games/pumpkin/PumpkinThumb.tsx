@@ -36,7 +36,7 @@ export function PumpkinThumb({
     // JSON.parse, so the array identity changes though a submitted pumpkin's
     // strokes cannot. Re-rasterizing all thumbs on every vote is wasted work.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [entry.slot, entry.strokes.length, entry.integrity])
+  }, [code, entry.slot, entry.strokes.length, entry.integrity])
 
   const state = INTEGRITY_TEXT[entry.integrity]
   // The accessible name carries the caption and the state, so assistive tech
