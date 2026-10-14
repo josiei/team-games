@@ -8,19 +8,28 @@ import { PumpkinPainter, strokeOps } from '../games/pumpkin/canvas.js'
 // fills (with its composite op), rebuilds that into strokes, and asks the real
 // `carvedRatio` -- the server's judge -- whether the result matches the
 // original. No grid rule is reimplemented; carvedRatio is the only oracle.
-type Fill = { op: string; x: number; y: number; r: number }
+type Fill = { op: string; style: unknown; x: number; y: number; r: number }
+
+/** Returned by createRadialGradient, so a fill can be told from a flat colour. */
+const GRADIENT = { addColorStop() {}, isGradient: true }
 
 function recordingContext() {
   const fills: Fill[] = []
   let pending: { x: number; y: number; r: number } | null = null
   const ctx = {
     globalCompositeOperation: 'source-over',
-    fillStyle: '',
+    fillStyle: '' as unknown,
+    strokeStyle: '' as unknown,
+    lineWidth: 0, lineCap: '', lineJoin: '',
     setTransform() {}, clearRect() {}, save() {}, restore() {}, clip() {},
+    stroke() {}, drawImage() {},
+    createRadialGradient() { return GRADIENT },
     beginPath() { pending = null },
     arc(x: number, y: number, r: number) { pending = { x, y, r } },
     fill(path?: unknown) {
-      if (path === undefined && pending) fills.push({ op: ctx.globalCompositeOperation, ...pending })
+      if (path === undefined && pending) {
+        fills.push({ op: ctx.globalCompositeOperation, style: ctx.fillStyle, ...pending })
+      }
     },
   }
   return { ctx, fills }
@@ -35,7 +44,9 @@ const toStrokes = (fills: Fill[]): Stroke[] => fills.map(f => ({
 let fake: ReturnType<typeof recordingContext>
 beforeEach(() => {
   fake = recordingContext()
-  vi.stubGlobal('Path2D', class { ellipse() {} moveTo() {} lineTo() {} arc() {} rect() {} closePath() {} })
+  vi.stubGlobal('Path2D', class {
+    ellipse() {} moveTo() {} lineTo() {} arc() {} rect() {} closePath() {} quadraticCurveTo() {}
+  })
   vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(fake.ctx as never)
 })
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals() })
@@ -75,6 +86,21 @@ describe('PumpkinPainter applies strokes in chronological order', () => {
     new PumpkinPainter().sync(strokes, THEME)
     expect(carvedRatio(toStrokes(fake.fills))).toBe(carvedRatio(strokes))
     expect(carvedRatio(strokes)).toBe(0)
+  })
+
+  // A cut is `destination-out`, which removes only as much as the source's own
+  // alpha. Inheriting the body's shading (a gradient that is transparent in the
+  // middle) left cuts barely cutting, and no screenshot of a static pumpkin
+  // shows it — the body looked right and the carving simply stopped.
+  it('cuts with an opaque colour, never with the body shading', () => {
+    const strokes = [at('cut', 0.2), at('uncut', 0.2)]
+    new PumpkinPainter().sync(strokes, THEME)
+    const [cut, restore] = fake.fills
+    expect(cut!.op).toBe('destination-out')
+    expect(typeof cut!.style).toBe('string')
+    expect(cut!.style).not.toBe(GRADIENT)
+    // and the restore paints the flesh back, shading included
+    expect(restore!.style).toBe(GRADIENT)
   })
 
   it('a stroke that grows between syncs paints only its new points', () => {
