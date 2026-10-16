@@ -78,12 +78,23 @@ async function carve(page: Page) {
   const onPath = [0.2, 0.4, 0.6, 0.8].map(t => along(A, B, t))
   const control: [number, number] = [0.5, 0.85]
 
-  // Baseline must be a painted pumpkin body: opaque, and the same orange at every
-  // sample. Poll, because the first paint is asynchronous.
+  /**
+   * Baseline must be a painted pumpkin body: opaque, and pumpkin-coloured at
+   * every sample.
+   *
+   * Checked by CHANNEL ORDER, not brightness. This used to require red > 200,
+   * which was true of the flat fill the body used to be and is not true of the
+   * shaded one: it carries a radial gradient, a rim vignette and seams, and the
+   * player's variety is drawn from the room code, so a sample can land on a
+   * dark seam or deep in the vignette. Measured over all six varieties at these
+   * five points: alpha is always 255, red runs 123..255, and red > green > blue
+   * holds everywhere with at least 66 and 44 to spare. Flesh is flesh at any
+   * brightness; a blank or black canvas fails the ordering immediately.
+   */
   let baseline: Rgba[] = []
   await expect.poll(async () => {
     baseline = await pixelsAt(canvas, [...onPath, control])
-    return baseline.every(px => px[3] === 255 && px[0] > 200)
+    return baseline.every(px => px[3] === 255 && px[0] > px[1] && px[1] > px[2] && px[0] > 90)
   }, { message: 'canvas painted an opaque pumpkin body before carving' }).toBe(true)
   const hashBefore = await canvasHash(canvas)
 
