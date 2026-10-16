@@ -54,6 +54,14 @@ const pixelsAt = (canvas: Locator, points: [number, number][]) =>
       [...ctx.getImageData(Math.round(x * el.width), Math.round(y * el.height), 1, 1).data] as Rgba)
   }, points)
 
+/**
+ * How far a sampled pixel must move for a cut to count as painted, on the
+ * 4-channel L1 metric below. Measured worst case is 46 (see `carve`); 30 keeps
+ * a third of that as margin while still being far above the 0 an unpainted
+ * canvas scores.
+ */
+const CUT_VISIBLE_MIN = 30
+
 const distance = (a: Rgba, b: Rgba) =>
   Math.abs(a[0] - b[0]) + Math.abs(a[1] - b[1]) + Math.abs(a[2] - b[2]) + Math.abs(a[3] - b[3])
 
@@ -112,15 +120,30 @@ async function carve(page: Page) {
   await expect(page.getByRole('meter', { name: /structural integrity/i })).toBeVisible()
   await expect(page.getByRole('button', { name: /submit pumpkin \(([2-9]|\d{2,}) strokes\)/i })).toBeVisible()
 
-  // Painting is on the next animation frame: poll until every path sample has changed.
+  /**
+   * Painting is on the next animation frame: poll until every path sample has
+   * changed.
+   *
+   * CUT_VISIBLE_MIN is measured, not guessed. The candle glow a cut reveals is
+   * deliberately the same palette as the flesh above it, so where the body is
+   * lit brightest the cut is only a modest shift: replaying this exact drag
+   * (brush 0.08, 41 steps) across all six varieties gives a worst sample of 46
+   * and a best of 275 on this metric. The threshold used to be 100, which was
+   * calibrated against the flat fill the body was before b499f97 and has been
+   * failing since.
+   *
+   * What makes this a real check is the pair, not the number: every pixel on
+   * the dragged line moves, and the control pixel away from both drags moves by
+   * EXACTLY zero. A cut that did not happen scores 0 on both.
+   */
   await expect.poll(async () => {
     const now = await pixelsAt(canvas, onPath)
     return Math.min(...now.map((px, i) => distance(px, baseline[i]!)))
   }, { message: 'pixels along the drag path changed substantially' })
-    .toBeGreaterThan(100)
+    .toBeGreaterThan(CUT_VISIBLE_MIN)
   const now = await pixelsAt(canvas, [...onPath, control])
   now.slice(0, onPath.length).forEach((px, i) =>
-    expect(distance(px, baseline[i]!), `path sample ${i} changed`).toBeGreaterThan(100))
+    expect(distance(px, baseline[i]!), `path sample ${i} changed`).toBeGreaterThan(CUT_VISIBLE_MIN))
   expect(now[onPath.length], 'control pixel untouched').toEqual(baseline[onPath.length])
   expect(await canvasHash(canvas)).not.toBe(hashBefore)
 }
