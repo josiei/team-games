@@ -22,7 +22,7 @@
         {
           "value": 200,
           "slug": "freddy-krueger",
-          "mosaic": 10,
+          "mosaic": 22,
           "choices": [
             "Freddy Krueger",
             "Michael Myers",
@@ -33,7 +33,7 @@
         {
           "value": 400,
           "slug": "pennywise",
-          "mosaic": 12,
+          "mosaic": 22,
           "choices": [
             "Pennywise",
             "Art the Clown",
@@ -44,7 +44,7 @@
         {
           "value": 600,
           "slug": "ghostface",
-          "mosaic": 14,
+          "mosaic": 22,
           "choices": [
             "Ghostface",
             "Billy the Puppet",
@@ -55,7 +55,7 @@
         {
           "value": 800,
           "slug": "michael-myers",
-          "mosaic": 18,
+          "mosaic": 22,
           "choices": [
             "Michael Myers",
             "Jason Voorhees",
@@ -99,7 +99,7 @@
         {
           "value": 400,
           "slug": "candy-apple",
-          "mosaic": 16,
+          "mosaic": 22,
           "choices": [
             "A caramel apple",
             "A cake pop",
@@ -110,7 +110,7 @@
         {
           "value": 600,
           "slug": "gummy-worms",
-          "mosaic": 20,
+          "mosaic": 22,
           "choices": [
             "Gummy worms",
             "Sour belts",
@@ -121,7 +121,7 @@
         {
           "value": 800,
           "slug": "mms",
-          "mosaic": 12,
+          "mosaic": 22,
           "choices": [
             "M&M's",
             "Reese's Pieces",
@@ -134,7 +134,7 @@
         {
           "value": 1000,
           "slug": "snickers",
-          "mosaic": 10,
+          "mosaic": 22,
           "choices": [
             "Snickers",
             "Milky Way",

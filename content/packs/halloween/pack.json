@@ -17,7 +17,7 @@
           "value": 200,
           "kind": "image",
           "file": "/games/fright-night/clues/483a9c847367da10.jpg",
-          "mosaic": 10,
+          "mosaic": 22,
           "prompt": "Who is this?",
           "choices": [
             "Freddy Krueger",
@@ -34,7 +34,7 @@
           "value": 400,
           "kind": "image",
           "file": "/games/fright-night/clues/7786dc3f4cb41d53.jpg",
-          "mosaic": 12,
+          "mosaic": 22,
           "prompt": "Who is this?",
           "choices": [
             "Pennywise",
@@ -51,7 +51,7 @@
           "value": 600,
           "kind": "image",
           "file": "/games/fright-night/clues/892c342d7598c8bc.jpg",
-          "mosaic": 14,
+          "mosaic": 22,
           "prompt": "Who is this?",
           "choices": [
             "Ghostface",
@@ -68,7 +68,7 @@
           "value": 800,
           "kind": "image",
           "file": "/games/fright-night/clues/245f86629666e08f.jpg",
-          "mosaic": 18,
+          "mosaic": 22,
           "prompt": "Who is this?",
           "choices": [
             "Michael Myers",
@@ -129,7 +129,7 @@
           "value": 400,
           "kind": "image",
           "file": "/games/fright-night/clues/c0cf6863513aeac3.jpg",
-          "mosaic": 16,
+          "mosaic": 22,
           "prompt": "What treat is this?",
           "choices": [
             "A caramel apple",
@@ -146,7 +146,7 @@
           "value": 600,
           "kind": "image",
           "file": "/games/fright-night/clues/3d308531939024b1.jpg",
-          "mosaic": 20,
+          "mosaic": 22,
           "prompt": "What treat is this?",
           "choices": [
             "Gummy worms",
@@ -163,7 +163,7 @@
           "value": 800,
           "kind": "image",
           "file": "/games/fright-night/clues/ffad7a945ab51f70.jpg",
-          "mosaic": 12,
+          "mosaic": 22,
           "prompt": "What treat is this?",
           "choices": [
             "M&M's",
@@ -182,7 +182,7 @@
           "value": 1000,
           "kind": "image",
           "file": "/games/fright-night/clues/bf5660b6b58bb6c3.jpg",
-          "mosaic": 10,
+          "mosaic": 22,
           "prompt": "What treat is this?",
           "choices": [
             "Snickers",

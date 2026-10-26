@@ -733,17 +733,26 @@ a canvas. Rough guide by row:
 
 | Row | Blocks across | Intent |
 |---|---|---|
-| 200 | ~10 | Nameable from a silhouette |
-| 400 | ~12 | |
-| 600 | ~14 | |
-| 800 | ~18 | |
-| 1000 | ~22 | Obscure subject; blur it less or it is unguessable |
+| 200 | 22 | Nameable from a silhouette |
+| 400 | 22 | |
+| 600 | 22 | |
+| 800 | 22 | |
+| 1000 | 22 | Obscure subject; blur it less or it is unguessable |
 
-Counter-intuitively the blur *decreases* as the value rises: difficulty at the top
-of the board comes from the subject being obscure, and a heavy mosaic over an
-obscure subject produces a clue nobody gets — an anti-goal. These are starting
-points for the playtest and belong in one constant table so they can be retuned
-without a code change, in the spirit of `CARVE_MS` and `VOTE_MS` in the README.
+**Retuned 2026-10-26 (author's call, supersedes decision 11's ramp).** The table
+above originally ran 10 → 22, the blur *decreasing* as the value rose. A mosaic
+ramp rendered over real photographs (`scripts/mosaic-ramp.py`, run on stand-in
+images outside the pack) showed the premise was wrong in one direction and right
+in another: at every level in that range a **face is unreadable**, so the low rows
+were not "nameable from a silhouette", they were unguessable. What survives a
+mosaic is a colour signature, a silhouette or a high-contrast prop — never facial
+detail.
+
+So every image clue is now pinned to **22 blocks, the clearest setting the ramp
+covered**; one wrapper already sat at 24 and keeps it. Image difficulty now comes
+from the subject and from the button count (decision 24), not from the mosaic.
+Cost if wrong: the image columns play easier than the trivia columns, which is
+a one-number-per-clue fix in `content/packs/halloween/spec.json`.
 
 ---
 
