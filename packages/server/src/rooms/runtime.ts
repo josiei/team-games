@@ -105,6 +105,10 @@ export class RoomRuntime {
     if (!('type' in action) || typeof action.type !== 'string') return
     if (!this.room.players.has(by)) return
 
+    // Read hostId now, not at start: the host moves when one disconnects, and
+    // the privilege has to move with it.
+    if (this.module.hostActions?.includes(action.type) && by !== this.room.hostId) return
+
     // `by` comes from the authenticated socket. Any `by` in the payload is ignored.
     // A module's reducer may not recognise the action (or choke on its shape);
     // either way the state must survive untouched.

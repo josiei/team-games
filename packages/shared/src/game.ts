@@ -67,6 +67,17 @@ export interface GameModule<State, Action, View> {
    * transitions one room may make — see MAX_PHASE_HOPS.
    */
   nextPhase?(state: State, current: string): string | null
+
+  /**
+   * Action types only the room's current host may dispatch. Everything else is
+   * open to any player in the room, as before.
+   *
+   * The check lives in the runtime rather than in `reduce` because `reduce` is
+   * pure and is handed only `by` — it has no way to know who the host is, and
+   * `hostId` moves when a host disconnects, so a copy taken at createState
+   * would be wrong by the time it mattered.
+   */
+  readonly hostActions?: readonly string[]
 }
 
 /**

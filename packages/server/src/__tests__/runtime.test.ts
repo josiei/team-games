@@ -718,3 +718,91 @@ describe('nextPhase', () => {
     err.mockRestore()
   })
 })
+
+describe('hostActions', () => {
+  /** Records every (by, action.type) pair the reducer actually sees. */
+  function spying(hostActions?: readonly string[]) {
+    const seen: { by: PlayerId; type: string }[] = []
+    const module = {
+      ...pumpkinModule,
+      ...(hostActions ? { hostActions } : {}),
+      reduce: (state: unknown, action: { type: string }, by: PlayerId) => {
+        seen.push({ by, type: action.type })
+        return state
+      },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as unknown as GameModule<any, any, any>
+    return { seen, module }
+  }
+
+  it('an action in hostActions from a non-host never reaches reduce', () => {
+    const { seen, module } = spying(['SKIP'])
+    const room = store.all()[0]!
+    const r = new RoomRuntime({ room, store, repo, module, send: () => {} })
+    r.start()
+    const notHost = ids.find(id => id !== room.hostId)!
+    r.dispatch(notHost, { type: 'SKIP' })
+    expect(seen).toEqual([])
+    r.dispose()
+  })
+
+  it('an action in hostActions from the host reaches reduce', () => {
+    const { seen, module } = spying(['SKIP'])
+    const room = store.all()[0]!
+    const r = new RoomRuntime({ room, store, repo, module, send: () => {} })
+    r.start()
+    r.dispatch(room.hostId!, { type: 'SKIP' })
+    expect(seen.map(s => s.type)).toEqual(['SKIP'])
+    r.dispose()
+  })
+
+  it('an action not in hostActions is ungated', () => {
+    const { seen, module } = spying(['SKIP'])
+    const room = store.all()[0]!
+    const r = new RoomRuntime({ room, store, repo, module, send: () => {} })
+    r.start()
+    const notHost = ids.find(id => id !== room.hostId)!
+    r.dispatch(notHost, { type: 'BUZZ' })
+    expect(seen.map(s => s.type)).toEqual(['BUZZ'])
+    r.dispose()
+  })
+
+  it('after host reassignment the new host can dispatch a host action', () => {
+    const { seen, module } = spying(['SKIP'])
+    const room = store.all()[0]!
+    const r = new RoomRuntime({ room, store, repo, module, send: () => {} })
+    r.start()
+    const firstHost = room.hostId!
+    r.onDisconnect(firstHost)                 // host moves to the next connected player
+    const newHost = room.hostId!
+    expect(newHost).not.toBe(firstHost)
+    r.dispatch(newHost, { type: 'SKIP' })
+    expect(seen.map(s => s.type)).toEqual(['SKIP'])
+    r.dispose()
+  })
+
+  it('the former host loses the privilege when the host moves', () => {
+    const { seen, module } = spying(['SKIP'])
+    const room = store.all()[0]!
+    const r = new RoomRuntime({ room, store, repo, module, send: () => {} })
+    r.start()
+    const firstHost = room.hostId!
+    r.onDisconnect(firstHost)
+    r.onConnect(firstHost)                    // back, but no longer host
+    expect(room.hostId).not.toBe(firstHost)
+    r.dispatch(firstHost, { type: 'SKIP' })
+    expect(seen).toEqual([])
+    r.dispose()
+  })
+
+  it('a module with no hostActions gates nothing', () => {
+    const { seen, module } = spying()
+    const room = store.all()[0]!
+    const r = new RoomRuntime({ room, store, repo, module, send: () => {} })
+    r.start()
+    const notHost = ids.find(id => id !== room.hostId)!
+    r.dispatch(notHost, { type: 'SKIP' })
+    expect(seen.map(s => s.type)).toEqual(['SKIP'])
+    r.dispose()
+  })
+})
