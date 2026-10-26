@@ -163,6 +163,8 @@ test('two players carve, vote, and see results', async ({ browser }) => {
   await host.goto('/')
   await host.getByLabel('Your name').fill(HOST_NAME)
   await host.getByRole('button', { name: /start a new room/i }).click()
+  // The picker now stands between "new room" and a room; pick the pumpkin.
+  await host.getByRole('button', { name: /Jack-o-Lantern Carving/i }).click()
   const code = (await host.locator('.room-code').textContent())?.trim()
   expect(code).toMatch(/^[A-Z2-9]{6}$/)
 
@@ -177,7 +179,7 @@ test('two players carve, vote, and see results', async ({ browser }) => {
   await expect(guest.getByText(GUEST_NAME)).toBeVisible()
 
   // Host starts; both reach the carve canvas
-  await host.getByRole('button', { name: /start carving/i }).click()
+  await host.getByRole('button', { name: /start game/i }).click()
   await expect(host.locator('canvas')).toBeVisible()
   await expect(guest.locator('canvas')).toBeVisible()
 

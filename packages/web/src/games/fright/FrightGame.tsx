@@ -5,6 +5,7 @@ import { Board, type BoardView } from './Board.js'
 import { Stage, type ClueView } from './Stage.js'
 import { Reveal, type RevealView } from './Reveal.js'
 import { Results, type ResultsView } from './Results.js'
+import { HostBar } from './HostBar.js'
 
 type AnyFrightView = BoardView | ClueView | RevealView | ResultsView
 
@@ -24,6 +25,9 @@ export function FrightGame({ onLeave }: { onLeave(): void }) {
   const endsAt = useConnection(s => s.endsAt)
   const clockOffset = useConnection(s => s.clockOffset)
   const dispatch = useConnection(s => s.dispatch)
+  const me = useConnection(s => s.me)
+  const hostId = useConnection(s => s.hostId)
+  const isHost = me !== null && me === hostId
 
   const secondsLeft = Math.ceil(remainingMs(endsAt, clockOffset) / 1000)
 
@@ -72,6 +76,15 @@ export function FrightGame({ onLeave }: { onLeave(): void }) {
       scores={view.scores ?? {}}
       lifelines={'lifelines' in view ? view.lifelines : {}}
       players={players}
+      banner={isHost && view.kind !== 'fright-results'
+        ? (
+          <HostBar
+            canSkip={view.kind === 'fright-clue'}
+            onSkip={() => dispatch({ type: 'SKIP' })}
+            onEnd={() => dispatch({ type: 'END' })}
+          />
+        )
+        : undefined}
     >
       {panel}
     </GameSet>

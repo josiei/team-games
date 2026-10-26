@@ -1,8 +1,9 @@
-import { describe, expect, it } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { describe, expect, it, vi } from 'vitest'
+import { fireEvent, render, screen } from '@testing-library/react'
 import type { Team } from '@tg/shared'
 import { Reveal, type RevealView } from '../games/fright/Reveal.js'
 import { Results, type ResultsView } from '../games/fright/Results.js'
+import { HostBar } from '../games/fright/HostBar.js'
 
 const TEAMS: Team[] = [
   { id: 'blue', name: 'Blue', color: '#3B82F6' },
@@ -124,5 +125,29 @@ describe('Results', () => {
   it('offers a way out', () => {
     render(<Results view={results()} teams={TEAMS} labels={LABELS} onLeave={() => {}} />)
     expect(screen.getByRole('button', { name: /leave/i })).toBeTruthy()
+  })
+})
+
+describe('HostBar', () => {
+  it('offers skip and end', () => {
+    render(<HostBar canSkip onSkip={() => {}} onEnd={() => {}} />)
+    expect(screen.getByRole('button', { name: /skip/i })).toBeTruthy()
+    expect(screen.getByRole('button', { name: /end game/i })).toBeTruthy()
+  })
+
+  it('disables skip when there is no clue to skip', () => {
+    render(<HostBar canSkip={false} onSkip={() => {}} onEnd={() => {}} />)
+    expect((screen.getByRole('button', { name: /skip/i }) as HTMLButtonElement).disabled)
+      .toBe(true)
+  })
+
+  it('reports each press', () => {
+    const onSkip = vi.fn()
+    const onEnd = vi.fn()
+    render(<HostBar canSkip onSkip={onSkip} onEnd={onEnd} />)
+    fireEvent.click(screen.getByRole('button', { name: /skip/i }))
+    fireEvent.click(screen.getByRole('button', { name: /end game/i }))
+    expect(onSkip).toHaveBeenCalled()
+    expect(onEnd).toHaveBeenCalled()
   })
 })
