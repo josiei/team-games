@@ -208,3 +208,190 @@
   .board-tile { transition: none; }
   .board-tile:hover:not(:disabled) { transform: none; }
 }
+
+/* ---- Clue stage -------------------------------------------------------- */
+
+.stage { display: grid; gap: 12px; align-content: start; padding: 4px; }
+
+.stage-head {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  margin: 0;
+  font-family: Archivo, system-ui, sans-serif;
+  font-weight: 800;
+  font-size: 0.8rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--fright-glow, #c4b5fd);
+}
+
+.stage-value { color: #ffc24d; }
+
+.stage-clue { display: grid; gap: 10px; justify-items: center; }
+
+.stage-prompt {
+  margin: 0;
+  max-width: 44ch;
+  text-align: center;
+  font-size: 1.15rem;
+  line-height: 1.4;
+  font-weight: 600;
+}
+
+.pixel-image { position: relative; width: min(280px, 50vw); aspect-ratio: 3 / 4; }
+
+/* Hard blocks, not a blur: the canvas is tiny and scaled up by the browser. */
+.pixel-canvas {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  image-rendering: pixelated;
+  border-radius: 6px;
+  box-shadow: 0 0 0 2px rgba(255, 117, 24, 0.5), 0 10px 30px rgba(0, 0, 0, 0.6);
+}
+
+.pixel-reveal {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 6px;
+  animation: pixel-resolve 500ms ease forwards;
+}
+
+@keyframes pixel-resolve { from { opacity: 0 } to { opacity: 1 } }
+
+/* ---- Choices ----------------------------------------------------------- */
+
+.choice-grid {
+  display: grid;
+  grid-template-columns: repeat(var(--cols, 2), 1fr);
+  gap: 8px;
+}
+
+.choice {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 10px;
+  align-items: center;
+  padding: 12px 14px;
+  text-align: left;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--shell-text, #f4f2f8);
+  background: #1b1338;
+  border: 2px solid #3a2f5c;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: border-color 100ms ease, background 100ms ease;
+}
+
+.choice:not(:disabled):hover,
+.choice:not(:disabled):focus-visible {
+  border-color: var(--fright-glow, #c4b5fd);
+  background: #261a4d;
+}
+
+.choice:disabled { cursor: default; }
+
+.choice-number {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  border-radius: 50%;
+  background: #0d0920;
+  border: 1px solid #4a3d75;
+}
+
+/* Wrong: struck through AND dimmed, so it never relies on colour alone. */
+.choice.is-wrong { opacity: 0.4; border-color: var(--fright-danger, #ef4444); }
+.choice.is-wrong .choice-text { text-decoration: line-through; }
+
+/* Cut by a flashlight: dimmed further, and only this viewer's team sees it. */
+.choice.is-cut { opacity: 0.22; border-style: dashed; }
+
+.flashlight {
+  justify-self: center;
+  padding: 9px 16px;
+  font-weight: 800;
+  font-size: 0.8rem;
+  letter-spacing: 0.04em;
+  color: #140a02;
+  background: #ffc24d;
+  border: none;
+  border-radius: 999px;
+  cursor: pointer;
+  box-shadow: 0 0 18px rgba(255, 194, 77, 0.55);
+}
+
+/* ---- Buzzer ------------------------------------------------------------ */
+
+.buzzer {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  padding: 16px;
+  font-family: Archivo, system-ui, sans-serif;
+  font-weight: 900;
+  font-size: 1.1rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  border-radius: 999px;
+  cursor: pointer;
+  /* Dead: grey, flat, not obviously a button. */
+  color: var(--shell-muted, #9a95ad);
+  background: #15102a;
+  border: 2px dashed #3a2f5c;
+  transition: background 140ms ease, color 140ms ease, box-shadow 140ms ease;
+}
+
+/* The single most important transition in the game. */
+.buzzer.is-armed {
+  color: #140a02;
+  background: var(--fright-accent2, #ff7518);
+  border: 2px solid var(--fright-accent2, #ff7518);
+  box-shadow: 0 0 28px rgba(255, 117, 24, 0.75);
+  animation: buzzer-arm 320ms ease;
+}
+
+@keyframes buzzer-arm {
+  from { transform: scale(0.97); box-shadow: 0 0 0 rgba(255, 117, 24, 0) }
+  60% { transform: scale(1.03) }
+  to { transform: scale(1) }
+}
+
+.buzzer:disabled { cursor: default; }
+.buzzer.is-armed:disabled { opacity: 0.45; }
+
+.buzzer-clock {
+  font-variant-numeric: tabular-nums;
+  font-size: 1.4rem;
+  min-width: 2ch;
+  text-align: center;
+}
+
+.answer-banner {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 14px;
+  margin: 0;
+  padding: 16px;
+  border-radius: 999px;
+  background: rgba(124, 58, 237, 0.14);
+  border: 2px solid var(--fright-accent, #7c3aed);
+  font-size: 0.95rem;
+}
+
+.answer-banner .buzzer-clock { color: var(--fright-accent2, #ff7518); font-weight: 900; }
+
+@media (prefers-reduced-motion: reduce) {
+  .buzzer, .buzzer.is-armed, .pixel-reveal { animation: none; transition: none; }
+}
