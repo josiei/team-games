@@ -18,15 +18,22 @@
   grid-template-rows: 1fr auto auto;
   gap: 12px;
   overflow: hidden;
+  /* The painted set, with the gradient behind it as the fallback the layout
+     was built against — if the image is missing the room still reads. */
   background:
+    linear-gradient(rgba(11, 7, 18, 0.55), rgba(11, 7, 18, 0.75)),
+    url('/games/fright-night/set.png') center / cover no-repeat,
     radial-gradient(ellipse at 50% 0%, #2a1a3e 0%, #150d22 55%, #0b0712 100%);
+  image-rendering: pixelated;
   color: var(--shell-text, #f4f2f8);
   font-family: Inter, system-ui, sans-serif;
 }
 
 /* ---- Backdrop ---------------------------------------------------------- */
 
-.set-sky { position: absolute; inset: 0 0 auto; height: 40%; pointer-events: none; }
+/* The painted set supplies the sky and pillars, so the CSS ones only show
+   when the image has not loaded. */
+.set-sky { position: absolute; inset: 0 0 auto; height: 40%; pointer-events: none; opacity: 0.4; }
 
 .set-star {
   position: absolute;
@@ -46,6 +53,7 @@
   border-radius: 4px;
   background: linear-gradient(90deg, #2b2440 0%, #6a5f8d 35%, #cfc6e8 50%, #6a5f8d 65%, #2b2440 100%);
   box-shadow: 0 0 40px rgba(196, 181, 253, 0.25);
+  opacity: 0.35;
 }
 
 .set-pillar.is-left { left: 10px; }
@@ -61,7 +69,7 @@
   padding: 10px;
   border-radius: 10px;
   border: 3px solid #5b4f80;
-  background: #0a0712;
+  background: rgba(10, 7, 18, 0.92);
   box-shadow: 0 0 60px rgba(124, 58, 237, 0.3), inset 0 0 40px rgba(0, 0, 0, 0.8);
 }
 
@@ -252,6 +260,7 @@
 }
 
 .pixel-reveal {
+  image-rendering: auto;   /* the un-pixelated photograph */
   position: absolute;
   inset: 0;
   width: 100%;
@@ -486,7 +495,12 @@
   border: 1px solid #3a2f5c;
 }
 
-.gallery-card img { width: 100%; aspect-ratio: 3 / 4; object-fit: cover; }
+.gallery-card img {
+  width: 100%;
+  aspect-ratio: 3 / 4;
+  object-fit: cover;
+  image-rendering: auto;   /* a photograph, not pixel art */
+}
 .gallery-answer { padding: 0 8px; font-weight: 700; font-size: 0.85rem; }
 .gallery-meta { padding: 0 8px; font-size: 0.7rem; color: var(--shell-muted, #9a95ad); }
 
