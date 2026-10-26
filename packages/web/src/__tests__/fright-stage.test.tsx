@@ -219,3 +219,30 @@ describe('an image clue that has not arrived yet', () => {
     expect(screen.getByText(/Transylvanian count/)).toBeTruthy()
   })
 })
+
+describe('the clock reads as a timer, not as part of the sentence', () => {
+  it('keeps the seconds out of the buzzer label', () => {
+    const { container } = render(
+      <Stage view={view({ armed: true, canBuzz: true })} {...noop} secondsLeft={20} />)
+    // "BUZZ IN 20" read as an instruction - buzz in 20 seconds' time, or for
+    // 20 points. The number has to be its own thing.
+    expect(container.querySelector('.buzzer-label')!.textContent).not.toContain('20')
+    expect(container.querySelector('.buzzer-clock')!.textContent).toBe('20')
+  })
+
+  it('announces the clock as remaining time for a screen reader', () => {
+    render(<Stage view={view({ armed: true, canBuzz: true })} {...noop} secondsLeft={9} />)
+    expect(screen.getByLabelText('9 seconds left')).toBeTruthy()
+  })
+
+  it('does the same on the answer banner', () => {
+    const { container } = render(
+      <Stage view={view({ answeringId: BLUE, answeringTeam: 'blue' })} {...noop}
+        answeringName="wosie" secondsLeft={12} />)
+    expect(container.querySelector('.buzzer-clock')!.textContent).toBe('12')
+    // textContent concatenates siblings whatever the layout does, so assert
+    // on the sentence element itself — that is what must not carry the number.
+    expect(container.querySelector('.answer-who')!.textContent).not.toContain('12')
+    expect(screen.getByLabelText('12 seconds left')).toBeTruthy()
+  })
+})

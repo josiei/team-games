@@ -34,7 +34,7 @@ export function GamePicker({ onPick, onCancel }: {
 
   return (
     <main className="lobby-stage">
-      <div className="lobby-content">
+      <div className="lobby-content is-wide">
         <h1 className="picker-title">Pick a game</h1>
 
         {load.state === 'loading' && <p role="status">Loading games&hellip;</p>}

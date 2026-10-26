@@ -101,3 +101,56 @@ describe('applyMessage', () => {
     expect(useConnection.getState().phase).toBe('carving')
   })
 })
+
+describe('a room that is gone', () => {
+  /** A WebSocket stand-in we can close with a chosen code. */
+  class FakeSocket {
+    static OPEN = 1
+    readyState = 1
+    onopen: (() => void) | null = null
+    onmessage: ((e: { data: string }) => void) | null = null
+    onclose: ((e: { code: number }) => void) | null = null
+    close() { /* the test drives onclose directly */ }
+    send() { /* no-op */ }
+  }
+
+  let sockets: FakeSocket[]
+
+  beforeEach(() => {
+    sockets = []
+    vi.stubGlobal('WebSocket', class extends FakeSocket {
+      constructor() { super(); sockets.push(this) }
+    })
+    vi.useFakeTimers()
+  })
+
+  afterEach(() => { vi.unstubAllGlobals(); useConnection.getState().disconnect() })
+
+  it('stops retrying when the server says the room is gone', () => {
+    // Rooms live in memory, so a server restart takes every room with it.
+    // Retrying forever leaves the last snapshot on screen looking alive.
+    useConnection.getState().connect('room-1', ME, 'tok')
+    expect(sockets).toHaveLength(1)
+    sockets[0]!.onclose!({ code: 4004 })
+
+    expect(useConnection.getState().status).toBe('room-gone')
+    vi.advanceTimersByTime(60_000)
+    expect(sockets).toHaveLength(1)          // never dialled again
+  })
+
+  it('stops retrying when the token is not recognised', () => {
+    useConnection.getState().connect('room-1', ME, 'tok')
+    sockets[0]!.onclose!({ code: 4003 })
+    expect(useConnection.getState().status).toBe('room-gone')
+    vi.advanceTimersByTime(60_000)
+    expect(sockets).toHaveLength(1)
+  })
+
+  it('still retries an ordinary drop, which is usually transient', () => {
+    useConnection.getState().connect('room-1', ME, 'tok')
+    sockets[0]!.onclose!({ code: 1006 })
+    expect(useConnection.getState().status).toBe('reconnecting')
+    vi.advanceTimersByTime(60_000)
+    expect(sockets.length).toBeGreaterThan(1)
+  })
+})

@@ -145,8 +145,10 @@ function Buzzer({ armed, canBuzz, secondsLeft, onBuzz }: {
       }}
     >
       {armed
-        ? <><span className="buzzer-label">Buzz in</span>
-            <span className="buzzer-clock">{secondsLeft}</span></>
+        ? <>
+            <span className="buzzer-label">Buzz in</span>
+            <Clock seconds={secondsLeft} />
+          </>
         : <span className="buzzer-label">&middot;&middot;&middot; Reading &middot;&middot;&middot;</span>}
     </button>
   )
@@ -159,8 +161,26 @@ function AnswerBanner({ name, team, secondsLeft }: {
 }) {
   return (
     <p className="answer-banner" role="status">
-      <strong>{name ?? 'Someone'}</strong> is answering for {team ?? 'their team'}
-      <span className="buzzer-clock">{secondsLeft}</span>
+      <span className="answer-who">
+        <strong>{name ?? 'Someone'}</strong> is answering for {team ?? 'their team'}
+      </span>
+      <Clock seconds={secondsLeft} />
     </p>
+  )
+}
+
+/**
+ * The countdown, set apart from whatever label sits beside it.
+ *
+ * "BUZZ IN 20" read as a sentence — buzz in twenty seconds' time, or buzz for
+ * twenty points — when it means twenty seconds left to buzz. A pill pushed to
+ * the far edge reads as an instrument rather than as the next word, which is
+ * the only thing that works on a clock this short.
+ */
+function Clock({ seconds }: { seconds: number }) {
+  return (
+    <span className="buzzer-clock" aria-label={`${seconds} seconds left`}>
+      {seconds}
+    </span>
   )
 }

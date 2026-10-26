@@ -287,3 +287,172 @@ describe('Lobby teams', () => {
       .toBe(false)
   })
 })
+
+describe('Lobby avatar feedback', () => {
+  const TEAMS2 = [
+    { id: 'blue', name: 'Blue', color: '#3B82F6' },
+    { id: 'red', name: 'Red', color: '#EF4444' },
+  ]
+
+  it('previews your chosen avatar even before you have joined a team', () => {
+    // Picking an avatar did nothing visible until you had also joined a team,
+    // because the only place it rendered was inside a team column.
+    useConnection.setState({
+      teams: TEAMS2,
+      me: ME,
+      players: [{ ...player(ME, 'Jocelyn', 1), avatar: 'witch', team: null }],
+    })
+    const { container } = render(<Lobby code={asRoomCode('AB2CD3')} playerToken="t" />)
+    const preview = container.querySelector('.you-preview')!
+    expect(preview).toBeTruthy()
+    expect(preview.querySelector('.portrait-face')!.textContent).toBe('\u{1F9D9}')
+    expect(preview.textContent).toContain('Jocelyn')
+  })
+
+  it('the preview prompts you when you have not picked one', () => {
+    useConnection.setState({
+      teams: TEAMS2,
+      me: ME,
+      players: [{ ...player(ME, 'Jocelyn', 1), avatar: '', team: null }],
+    })
+    const { container } = render(<Lobby code={asRoomCode('AB2CD3')} playerToken="t" />)
+    expect(container.querySelector('.you-preview')!.textContent).toMatch(/pick one/i)
+  })
+
+  it('labels the avatar strip so it is clear what it is for', () => {
+    useConnection.setState({ teams: TEAMS2 })
+    render(<Lobby code={asRoomCode('AB2CD3')} playerToken="t" />)
+    expect(screen.getByText(/your avatar/i)).toBeTruthy()
+  })
+
+  it('renders exactly one column per declared team', () => {
+    useConnection.setState({ teams: TEAMS2 })
+    const { container } = render(<Lobby code={asRoomCode('AB2CD3')} playerToken="t" />)
+    expect(container.querySelectorAll('.team-columns > .team-column')).toHaveLength(2)
+  })
+})
+
+describe('Lobby team portraits', () => {
+  const TEAMS3 = [
+    { id: 'blue', name: 'Blue', color: '#3B82F6' },
+    { id: 'red', name: 'Red', color: '#EF4444' },
+  ]
+  const third = asPlayerId('third')
+
+  function seatThem() {
+    useConnection.setState({
+      teams: TEAMS3,
+      hostId: ME,
+      me: ME,
+      players: [
+        { ...player(ME, 'Jocelyn', 1), avatar: 'witch', team: 'blue' },
+        { ...player(OTHER, 'Sam', 2), avatar: 'ghost', team: 'blue' },
+        { ...player(third, 'Ash', 3), avatar: 'bat', team: 'red' },
+      ],
+      labels: { me: 'Jocelyn', other: 'Sam', third: 'Ash' },
+    })
+  }
+
+  it('shows each member as a portrait carrying their avatar and name', () => {
+    seatThem()
+    const { container } = render(<Lobby code={asRoomCode('AB2CD3')} playerToken="t" />)
+    const blue = container.querySelectorAll('.team-column')[0]!
+    const portraits = blue.querySelectorAll('.portrait')
+    expect(portraits).toHaveLength(2)
+    expect(portraits[0]!.textContent).toContain('Jocelyn')
+    expect(portraits[0]!.querySelector('.portrait-face')!.textContent).toBe('\u{1F9D9}')
+  })
+
+  it('marks the host portrait with a crown', () => {
+    seatThem()
+    const { container } = render(<Lobby code={asRoomCode('AB2CD3')} playerToken="t" />)
+    const mine = container.querySelector('.portrait.is-host')!
+    expect(mine.textContent).toContain('Jocelyn')
+    expect(container.querySelectorAll('.portrait.is-host')).toHaveLength(1)
+  })
+
+  it('marks your own portrait so you can find yourself', () => {
+    seatThem()
+    const { container } = render(<Lobby code={asRoomCode('AB2CD3')} playerToken="t" />)
+    expect(container.querySelectorAll('.portrait.is-me')).toHaveLength(1)
+    expect(container.querySelector('.portrait.is-me')!.textContent).toContain('Jocelyn')
+  })
+
+  it('drops the duplicate roster when the game has teams', () => {
+    // Every player was listed twice: once in a team column, once below.
+    seatThem()
+    const { container } = render(<Lobby code={asRoomCode('AB2CD3')} playerToken="t" />)
+    expect(container.querySelector('.roster')).toBeNull()
+  })
+
+  it('keeps the plain roster for a game with no teams', () => {
+    useConnection.setState({ teams: undefined })
+    const { container } = render(<Lobby code={asRoomCode('AB2CD3')} playerToken="t" />)
+    expect(container.querySelector('.roster')).toBeTruthy()
+    expect(container.querySelector('.team-columns')).toBeNull()
+  })
+
+  it('an empty team still says so', () => {
+    useConnection.setState({
+      teams: TEAMS3, hostId: ME, me: ME,
+      players: [{ ...player(ME, 'Jocelyn', 1), avatar: 'witch', team: 'blue' }],
+    })
+    const { container } = render(<Lobby code={asRoomCode('AB2CD3')} playerToken="t" />)
+    const red = container.querySelectorAll('.team-column')[1]!
+    expect(red.textContent).toMatch(/nobody yet/i)
+  })
+})
+
+describe('Lobby shows which team is yours', () => {
+  const TEAMS4 = [
+    { id: 'blue', name: 'Blue', color: '#3B82F6' },
+    { id: 'red', name: 'Red', color: '#EF4444' },
+  ]
+
+  function onBlue() {
+    useConnection.setState({
+      teams: TEAMS4, hostId: ME, me: ME,
+      players: [{ ...player(ME, 'Jocelyn', 1), avatar: 'witch', team: 'blue' }],
+    })
+  }
+
+  it('badges the team you are on', () => {
+    onBlue()
+    const { container } = render(<Lobby code={asRoomCode('AB2CD3')} playerToken="t" />)
+    const cols = container.querySelectorAll('.team-column')
+    expect(cols[0]!.querySelector('.team-yours')).toBeTruthy()
+    expect(cols[1]!.querySelector('.team-yours')).toBeNull()
+  })
+
+  it('offers to leave the team you are on, not to join it again', () => {
+    onBlue()
+    const { container } = render(<Lobby code={asRoomCode('AB2CD3')} playerToken="t" />)
+    expect(screen.queryByRole('button', { name: /join blue/i })).toBeNull()
+    expect(screen.getByRole('button', { name: /leave blue/i })).toBeTruthy()
+    // The other team stays joinable, which is how you switch sides.
+    expect(screen.getByRole('button', { name: /join red/i })).toBeTruthy()
+    expect(container.querySelectorAll('.team-column')[0]!.className).toContain('is-mine')
+  })
+
+  it('leaving clears your team', async () => {
+    const mock = vi.fn(async () =>
+      ({ ok: true, json: async () => ({ ok: true }) }) as unknown as Response)
+    vi.stubGlobal('fetch', mock)
+    onBlue()
+    render(<Lobby code={asRoomCode('AB2CD3')} playerToken="t" />)
+    fireEvent.click(screen.getByRole('button', { name: /leave blue/i }))
+    await waitFor(() => expect(mock).toHaveBeenCalled())
+    const [, init] = mock.mock.calls[0] as unknown as [string, RequestInit]
+    expect(JSON.parse(String(init.body)).team).toBeNull()
+  })
+
+  it('offers join on both teams while you are on neither', () => {
+    useConnection.setState({
+      teams: TEAMS4, hostId: ME, me: ME,
+      players: [{ ...player(ME, 'Jocelyn', 1), avatar: 'witch', team: null }],
+    })
+    render(<Lobby code={asRoomCode('AB2CD3')} playerToken="t" />)
+    expect(screen.getByRole('button', { name: /join blue/i })).toBeTruthy()
+    expect(screen.getByRole('button', { name: /join red/i })).toBeTruthy()
+  })
+})

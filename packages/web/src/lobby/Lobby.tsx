@@ -1,5 +1,8 @@
 import { useState, type CSSProperties } from 'react'
-import { AVATARS, avatarById, type Player, type RoomCode, type Team } from '@tg/shared'
+import {
+  AVATARS, avatarById,
+  type Player, type PlayerId, type RoomCode, type Team,
+} from '@tg/shared'
 import { useConnection } from '../store/connection.js'
 import { HostLine } from '../ui/HostLine.js'
 import { PlayerPip } from '../ui/PlayerPip.js'
@@ -35,6 +38,10 @@ export function Lobby({ code, playerToken, onLeave }: {
   const lopsided = hasTeams && sizes.length > 0
     && Math.max(...sizes) - Math.min(...sizes) >= 2
 
+  const myself = me === null ? undefined : ordered.find(p => p.id === me)
+  const myAvatar = myself?.avatar ?? ''
+  const myName = myself ? labels[myself.id] ?? myself.displayName : 'you'
+
   async function choose(patch: { avatar?: string; team?: string | null }) {
     setError(null)
     try { await setProfile(code, playerToken, patch) }
@@ -47,7 +54,7 @@ export function Lobby({ code, playerToken, onLeave }: {
   return (
     <main className="lobby-stage">
       <Spiral />
-      <div className="lobby-content">
+      <div className={`lobby-content${hasTeams ? ' has-teams' : ''}`}>
         <div className="code-sign">
           <p className="code-sign-label">Room code</p>
           <p className="room-code">{code}</p>
@@ -67,12 +74,26 @@ export function Lobby({ code, playerToken, onLeave }: {
                   team={team}
                   members={ordered.filter(p => p.team === team.id)}
                   labels={labels}
+                  hostId={hostId}
+                  me={me}
                   mine={me !== null && ordered.find(p => p.id === me)?.team === team.id}
                   onJoin={() => void choose({ team: team.id })}
+                  onLeave={() => void choose({ team: null })}
                 />
               ))}
             </div>
 
+            <div className="you-preview">
+              <span className="portrait-face" aria-hidden="true">
+                {avatarById(myAvatar)?.emoji ?? '?'}
+              </span>
+              <span className="you-preview-text">
+                {myAvatar
+                  ? <>You are <strong>{myName}</strong></>
+                  : <>Pick one below, <strong>{myName}</strong></>}
+              </span>
+            </div>
+            <p className="avatar-strip-label">Your avatar</p>
             <div className="avatar-strip" role="group" aria-label="Choose your avatar">
               {AVATARS.map(a => {
                 const mine = me !== null && ordered.find(p => p.id === me)?.avatar === a.id
@@ -92,10 +113,20 @@ export function Lobby({ code, playerToken, onLeave }: {
           </>
         )}
 
-        <ul className="roster">
+        {!hasTeams && <ul className="roster">
           {ordered.map((player, index) => (
             <li key={player.id} className="roster-row" style={{ '--i': index } as CSSProperties}>
-              <PlayerPip id={player.id} connected={player.connected} />
+              {avatarById(player.avatar)
+                ? (
+                  <span
+                    className="roster-avatar"
+                    aria-hidden="true"
+                    style={{ opacity: player.connected ? 1 : 0.5 }}
+                  >
+                    {avatarById(player.avatar)!.emoji}
+                  </span>
+                )
+                : <PlayerPip id={player.id} connected={player.connected} />}
               <strong className="roster-name" style={{ opacity: player.connected ? 1 : 0.5 }}>
                 {labels[player.id] ?? player.displayName}
               </strong>
@@ -110,7 +141,7 @@ export function Lobby({ code, playerToken, onLeave }: {
               <span className="roster-name is-quiet">Open seat</span>
             </li>
           ))}
-        </ul>
+        </ul>}
 
         <HostLine />
 
@@ -158,13 +189,23 @@ export function Lobby({ code, playerToken, onLeave }: {
   )
 }
 
-/** One team's roster, with a join button for anyone not already on it. */
-function TeamColumn({ team, members, labels, mine, onJoin }: {
+/**
+ * One team, as a row of portraits.
+ *
+ * A name per line grew the card by one row per player and pushed the start
+ * button off the screen at a real team size; portraits wrap four to a row, so
+ * fifteen people cost four rows rather than fifteen. Seeing a face land in a
+ * box is also the thing that makes joining a team feel like joining a team.
+ */
+function TeamColumn({ team, members, labels, hostId, me, mine, onJoin, onLeave }: {
   team: Team
   members: Player[]
   labels: Record<string, string>
+  hostId: PlayerId | null
+  me: PlayerId | null
   mine: boolean
   onJoin(): void
+  onLeave(): void
 }) {
   return (
     <section
@@ -172,19 +213,49 @@ function TeamColumn({ team, members, labels, mine, onJoin }: {
       style={{ '--team': team.color } as CSSProperties}
       aria-label={`${team.name} team`}
     >
-      <h2 className="team-name">{team.name}</h2>
-      <ul className="team-roster">
-        {members.map(p => (
-          <li key={p.id} className="team-member">
-            <span aria-hidden="true">{avatarById(p.avatar)?.emoji ?? '\u2022'}</span>
-            <span style={{ opacity: p.connected ? 1 : 0.5 }}>
-              {labels[p.id] ?? p.displayName}
-            </span>
-          </li>
-        ))}
-        {members.length === 0 && <li className="team-member is-quiet">Nobody yet</li>}
-      </ul>
-      <button className="btn-neon team-join" onClick={onJoin}>Join {team.name}</button>
+      <h2 className="team-name">
+        {team.name}
+        {mine && <span className="team-yours">Your team</span>}
+      </h2>
+
+      <div className="team-portraits">
+        {members.map(p => {
+          const label = labels[p.id] ?? p.displayName
+          return (
+            <div
+              key={p.id}
+              className={[
+                'portrait',
+                p.id === hostId ? 'is-host' : '',
+                p.id === me ? 'is-me' : '',
+                p.connected ? '' : 'is-away',
+              ].filter(Boolean).join(' ')}
+              title={p.id === hostId ? `${label} (host)` : label}
+            >
+              <span className="portrait-face" aria-hidden="true">
+                {avatarById(p.avatar)?.emoji ?? '\u2022'}
+              </span>
+              {p.id === hostId && (
+                <span className="portrait-crown" aria-hidden="true">{'\u{1F451}'}</span>
+              )}
+              <span className="portrait-name">{label}</span>
+            </div>
+          )
+        })}
+        {members.length === 0 && <p className="team-empty">Nobody yet</p>}
+      </div>
+
+      {mine
+        ? (
+          <button className="btn-quiet team-join" onClick={onLeave}>
+            Leave {team.name}
+          </button>
+        )
+        : (
+          <button className="btn-neon team-join" onClick={onJoin}>
+            Join {team.name}
+          </button>
+        )}
     </section>
   )
 }

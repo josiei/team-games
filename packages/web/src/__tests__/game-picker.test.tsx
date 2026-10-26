@@ -102,3 +102,16 @@ describe('GamePicker', () => {
     await waitFor(() => expect(screen.getByText(/no games/i)).toBeTruthy())
   })
 })
+
+describe('picker layout', () => {
+  it('gives the grid its full width so cards sit side by side', async () => {
+    // Same trap as the team columns: the lobby centres its children at their
+    // natural width, so an auto-fit grid collapses to a single column and the
+    // second card falls below the fold.
+    mockFetch(async () => GAMES)
+    const { container } = render(<GamePicker onPick={() => {}} onCancel={() => {}} />)
+    await screen.findByText('Fright Night')
+    expect(container.querySelector('.lobby-content')!.className).toContain('is-wide')
+    expect(container.querySelectorAll('.picker-grid > li')).toHaveLength(2)
+  })
+})

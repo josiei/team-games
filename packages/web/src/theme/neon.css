@@ -419,10 +419,26 @@
   color: var(--shell-muted);
 }
 
+/* Overlaid, not inserted: in normal flow this shoved the whole lobby down
+   by its own height every time it appeared and snapped it back when it went,
+   which read as the page glitching rather than as a connection notice. */
 .reconnecting {
+  position: absolute;
+  top: -6px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 3;
   margin: 0;
-  text-align: center;
-  color: var(--neon-glow);
+  padding: 3px 12px;
+  border-radius: 999px;
+  background: rgba(14, 13, 20, 0.92);
+  border: 1px solid #ffc24d;
+  color: #ffc24d;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  white-space: nowrap;
 }
 
 /* Three dots that fill in and reset, so a wait never looks frozen. */
@@ -1034,14 +1050,23 @@
   margin: 0 0 20px;
 }
 
+/* The parent centres its children at their natural width, so this has to
+   claim the full width itself or auto-fit collapses it to one column and the
+   second game falls below the fold. */
 .picker-grid {
+  width: 100%;
   list-style: none;
   margin: 0 0 20px;
   padding: 0;
   display: grid;
   gap: 16px;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
 }
+
+/* Enough room for two or three game cards abreast. */
+.lobby-content.is-wide { max-width: 820px; }
+
+.picker-thumb { aspect-ratio: 16 / 10; }
 
 .picker-card {
   display: grid;
@@ -1068,7 +1093,6 @@
 .picker-thumb {
   display: block;
   width: 100%;
-  aspect-ratio: 16 / 9;
   object-fit: cover;
   margin-bottom: 8px;
 }
@@ -1100,11 +1124,66 @@
 
 /* ---- Lobby teams ------------------------------------------------------- */
 
+/* Two teams read as a choice between two things only when they sit side by
+   side. The parent centres its children at their natural width, so this has
+   to claim the full width itself or auto-fit collapses it to one column. */
 .team-columns {
+  width: 100%;
   display: grid;
   gap: 16px;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   margin-bottom: 18px;
+}
+
+/* Two columns need more room than the single-column join card. */
+.lobby-content.has-teams { max-width: 620px; }
+
+/* Who you are right now, before you have joined anything. Without it,
+   choosing an avatar changed nothing you could see. */
+.you-preview {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 14px 8px 8px;
+  border-radius: 999px;
+  background: var(--shell-surface, #1a1826);
+  border: 1px solid var(--shell-border, #2e2b3f);
+}
+
+.you-preview .portrait-face {
+  --team: #6a5f8d;
+  width: 40px;
+  height: 40px;
+  font-size: 1.35rem;
+  box-shadow: none;
+}
+
+.you-preview-text { font-size: 0.85rem; color: var(--shell-muted, #9a95ad); }
+.you-preview-text strong { color: var(--shell-text, #f4f2f8); }
+
+.avatar-strip-label {
+  margin: 0 0 -8px;
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--shell-muted, #9a95ad);
+}
+
+/* The chosen avatar, shown in the roster so picking one does something
+   immediately rather than only after joining a team. */
+.roster-avatar {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  font-size: 1.2rem;
+  line-height: 1;
+}
+
+/* A phone, or a narrow window: stacked beats squeezed. */
+@media (max-width: 460px) {
+  .team-columns { grid-template-columns: 1fr; }
 }
 
 .team-column {
@@ -1117,9 +1196,19 @@
   background: color-mix(in srgb, var(--team, #666) 12%, var(--shell-surface, #1a1826));
 }
 
-/* Your own team is outlined, never colour alone. */
+/* The card you are on, said in a badge and a glow rather than colour alone —
+   without it, joining a team left the card looking exactly as it did before. */
 .team-column.is-mine {
-  box-shadow: 0 0 0 2px var(--shell-text, #f4f2f8) inset;
+  box-shadow: 0 0 0 2px #ffc24d inset, 0 0 22px rgba(255, 194, 77, 0.35);
+}
+
+.team-yours {
+  display: block;
+  margin-top: 4px;
+  font-size: 0.6rem;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  color: #ffc24d;
 }
 
 .team-name {
@@ -1133,17 +1222,97 @@
   color: var(--shell-text, #f4f2f8);
 }
 
-.team-roster { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; min-height: 60px; }
-
-.team-member {
+/* Portraits wrap, so a team grows by a row every four people rather than
+   every one. A cap plus a scroll is the backstop if a room ever gets silly. */
+.team-portraits {
   display: flex;
-  gap: 8px;
-  align-items: center;
-  font-weight: 600;
-  color: var(--shell-text, #f4f2f8);
+  flex-wrap: wrap;
+  gap: 10px 8px;
+  justify-content: center;
+  align-content: flex-start;
+  min-height: 96px;
+  max-height: 300px;
+  overflow-y: auto;
+  padding: 2px;
 }
 
-.team-member.is-quiet { color: var(--shell-muted, #9a95ad); font-style: italic; font-weight: 400; }
+.portrait {
+  position: relative;
+  width: 76px;
+  display: grid;
+  justify-items: center;
+  padding-bottom: 2px;
+}
+
+.portrait-face {
+  display: grid;
+  place-items: center;
+  width: 62px;
+  height: 62px;
+  font-size: 2rem;
+  line-height: 1;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--team, #666) 38%, #0e0d14);
+  border: 2px solid color-mix(in srgb, var(--team, #666) 80%, #fff 12%);
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.5);
+}
+
+/* Your own face, found at a glance in a box of fifteen. */
+.portrait.is-me .portrait-face {
+  border-color: #ffc24d;
+  box-shadow: 0 0 10px rgba(255, 194, 77, 0.8);
+}
+
+.portrait.is-away { opacity: 0.45; }
+
+.portrait-crown {
+  position: absolute;
+  top: -7px;
+  right: 6px;
+  z-index: 2;
+  font-size: 0.95rem;
+  line-height: 1;
+  transform: rotate(16deg);
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.7));
+}
+
+/* A nameplate sitting ON the portrait, not a caption under it: the name and
+   the face read as one badge, which is the thing that makes a portrait feel
+   like a player rather than a list entry. */
+.portrait-name {
+  position: relative;
+  z-index: 1;
+  margin-top: -11px;
+  max-width: 100%;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--team, #666) 85%, #000 30%);
+  border: 1px solid color-mix(in srgb, var(--team, #666) 60%, #fff 25%);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.6);
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  line-height: 1.45;
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #fff;
+}
+
+/* Your own nameplate, so you find yourself in a box of fifteen. */
+.portrait.is-me .portrait-name {
+  background: #ffc24d;
+  border-color: #fff;
+  color: #140a02;
+}
+
+.team-empty {
+  margin: auto;
+  color: var(--shell-muted, #9a95ad);
+  font-style: italic;
+  font-size: 0.85rem;
+}
 
 .team-join { width: 100%; }
 

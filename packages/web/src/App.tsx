@@ -140,6 +140,21 @@ function Router() {
     )
   }
 
+  // The room is gone for good: the server restarted (rooms live in memory) or
+  // it expired. Say so and clear the session, rather than leaving the last
+  // snapshot on screen looking like a live game.
+  if (status === 'room-gone') {
+    return (
+      <main style={{ maxWidth: 420, margin: '12vh auto', padding: 16 }}>
+        <p role="alert">
+          This room has ended. The server may have restarted &mdash; rooms are not
+          kept once it stops.
+        </p>
+        <button onClick={leave}>Back to the start</button>
+      </main>
+    )
+  }
+
   if (status === 'taken-over') {
     // The session is deliberately KEPT: localStorage is shared with the tab that
     // took over, and re-joining with the token reclaims the player (the new
