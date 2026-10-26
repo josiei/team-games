@@ -52,6 +52,21 @@ export interface GameModule<State, Action, View> {
    * leaves this out and every phase runs its full duration.
    */
   phaseComplete?(state: State, phase: string, players: Player[]): boolean
+
+  /**
+   * The phase to enter when `current` ends, or null to stop there. Omit it and
+   * the runtime walks `phases` in order, which is what every linear game wants.
+   *
+   * Implement it when the order is decided at runtime rather than written down:
+   * a board game returns to its board as many times as there are tiles, in
+   * whatever order the players pick, and an index walk cannot express that.
+   *
+   * The returned name MUST be one of `phases`; anything else is treated as a
+   * module bug and ends the room visibly rather than stalling it. Because this
+   * can return to a phase already visited, the runtime caps how many
+   * transitions one room may make — see MAX_PHASE_HOPS.
+   */
+  nextPhase?(state: State, current: string): string | null
 }
 
 /**

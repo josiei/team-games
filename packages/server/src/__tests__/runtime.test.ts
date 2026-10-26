@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { InMemoryRoomStore } from '../rooms/store.js'
-import { EARLY_ADVANCE_MS, RoomRuntime } from '../rooms/runtime.js'
+import { EARLY_ADVANCE_MS, MAX_PHASE_HOPS, RoomRuntime } from '../rooms/runtime.js'
 import { pumpkinModule } from '../games/pumpkin/index.js'
 import { createDb } from '../db/client.js'
 import { Repo } from '../db/repo.js'
@@ -622,6 +622,98 @@ describe('disposed and logging hygiene', () => {
     const line = String(err.mock.calls[0]![0])
     expect(line).not.toContain('\n')
     expect(line).not.toContain('y'.repeat(20))
+    r.dispose()
+    err.mockRestore()
+  })
+})
+
+describe('nextPhase', () => {
+  type StubState = { phase: string }
+
+  /**
+   * A module with its own tiny phase list. `phaseMs` has no entry for these
+   * names, so no phase clock arms and every transition here is driven by an
+   * explicit advancePhase() — which is what makes the hop-budget test fast.
+   */
+  function stub(overrides: Partial<GameModule<StubState, unknown, unknown>> = {}) {
+    return {
+      ...pumpkinModule,
+      phases: ['lobby', 'a', 'b', 'c'],
+      createState: () => ({ phase: 'lobby' }),
+      setPhase: (state: StubState, phase: string) => ({ ...state, phase }),
+      viewFor: (state: StubState) => ({ kind: 'stub', phase: state.phase }),
+      onPhaseEnter: () => {},
+      ...overrides,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as unknown as GameModule<any, any, any>
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  function runWith(module: GameModule<any, any, any>) {
+    const room = store.all()[0]!
+    const r = new RoomRuntime({
+      room, store, repo, module,
+      send: (to, message) => sent.push({ to, message }),
+    })
+    return r
+  }
+
+  it('a module without nextPhase advances by index', () => {
+    const r = runWith(stub())
+    r.start()
+    expect(r.phase).toBe('a')
+    r.advancePhase()
+    expect(r.phase).toBe('b')
+    r.dispose()
+  })
+
+  it('nextPhase can return an earlier phase, so a loop is possible', () => {
+    const r = runWith(stub({
+      nextPhase: (_state, current) => (current === 'b' ? 'a' : 'b'),
+    }))
+    r.start()
+    expect(r.phase).toBe('a')
+    r.advancePhase()
+    expect(r.phase).toBe('b')
+    r.advancePhase()
+    expect(r.phase).toBe('a')      // an index walk could never get back here
+    r.dispose()
+  })
+
+  it('nextPhase returning null leaves the room in its current phase', () => {
+    const r = runWith(stub({ nextPhase: () => null }))
+    r.start()
+    expect(r.phase).toBe('a')
+    r.advancePhase()
+    expect(r.phase).toBe('a')
+    r.dispose()
+  })
+
+  it('nextPhase returning an unknown phase fails the room with PHASE_FAILED', () => {
+    const err = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const r = runWith(stub({ nextPhase: () => 'not-a-phase' }))
+    r.start()
+    sent.length = 0
+    r.advancePhase()
+    const codes = sent
+      .filter(s => s.message.type === 'error')
+      .map(s => (s.message as { code: string }).code)
+    expect(codes).toContain('PHASE_FAILED')
+    expect(r.phase).toBe('c')      // the terminal phase, not the bad name
+    r.dispose()
+    err.mockRestore()
+  })
+
+  it('a nextPhase that returns its own phase stops at MAX_PHASE_HOPS and fails the room', () => {
+    const err = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const r = runWith(stub({ nextPhase: (_state, current) => current }))
+    r.start()
+    for (let i = 0; i < MAX_PHASE_HOPS + 5; i++) r.advancePhase()
+    const codes = sent
+      .filter(s => s.message.type === 'error')
+      .map(s => (s.message as { code: string }).code)
+    expect(codes).toContain('PHASE_FAILED')
+    expect(r.phase).toBe('c')
     r.dispose()
     err.mockRestore()
   })
