@@ -1,0 +1,503 @@
+{
+  "id": "halloween-2026",
+  "name": "Halloween 2026",
+  "values": [
+    200,
+    400,
+    600,
+    800,
+    1000
+  ],
+  "categories": [
+    {
+      "id": "whos-that-killer",
+      "name": "Who's That Killer?",
+      "clues": [
+        {
+          "value": 200,
+          "kind": "image",
+          "file": "/games/fright-night/clues/3c7acff3aaabc25b.jpg",
+          "mosaic": 10,
+          "prompt": "Who is this?",
+          "choices": [
+            "Freddy Krueger",
+            "Michael Myers",
+            "Jason Voorhees",
+            "Ghostface"
+          ],
+          "source": "https://commons.wikimedia.org/wiki/File:Comiccon_Brussels_2023_-_Cosplay_of_Freddy_Krueger.jpg",
+          "license": "CC BY-SA 2.0",
+          "author": "Miguel Discart &amp; Kiri Karma",
+          "verifiedAt": "2026-10-25"
+        },
+        {
+          "value": 400,
+          "kind": "image",
+          "file": "/games/fright-night/clues/ce6db775495f03a4.jpg",
+          "mosaic": 12,
+          "prompt": "Who is this?",
+          "choices": [
+            "Pennywise",
+            "Art the Clown",
+            "Captain Spaulding",
+            "Twisty the Clown"
+          ],
+          "source": "https://commons.wikimedia.org/wiki/File:Pennywise_Cosplay_1.jpg",
+          "license": "CC BY-SA 2.0",
+          "author": "Pikawil",
+          "verifiedAt": "2026-10-25"
+        },
+        {
+          "value": 600,
+          "kind": "image",
+          "file": "/games/fright-night/clues/deeea1086216acb4.jpg",
+          "mosaic": 14,
+          "prompt": "Who is this?",
+          "choices": [
+            "Ghostface",
+            "Billy the Puppet",
+            "Michael Myers",
+            "Leatherface"
+          ],
+          "source": "https://commons.wikimedia.org/wiki/File:Japan_Expo_2024_-_Cosplay_of_Ghost_Face.jpg",
+          "license": "CC BY 2.0",
+          "author": "St\u00e9phane Gallay",
+          "verifiedAt": "2026-10-25"
+        },
+        {
+          "value": 800,
+          "kind": "image",
+          "file": "/games/fright-night/clues/cdd437a2d20bb4a7.jpg",
+          "mosaic": 18,
+          "prompt": "Who is this?",
+          "choices": [
+            "Michael Myers",
+            "Jason Voorhees",
+            "Leatherface",
+            "Ghostface",
+            "Chucky",
+            "Billy the Puppet"
+          ],
+          "source": "https://commons.wikimedia.org/wiki/File:Japan_Expo_2024_-_Cosplay_of_Michael_Myers.jpg",
+          "license": "CC BY-SA 2.0",
+          "author": "Miguel Discart / Kiri Karma",
+          "verifiedAt": "2026-10-25"
+        },
+        {
+          "value": 1000,
+          "kind": "image",
+          "file": "/games/fright-night/clues/02d79d8aa9490f60.jpg",
+          "mosaic": 22,
+          "prompt": "Who is this?",
+          "choices": [
+            "Jason Voorhees",
+            "Michael Myers",
+            "Leatherface",
+            "Ghostface",
+            "Jigsaw",
+            "Victor Crowley"
+          ],
+          "source": "https://commons.wikimedia.org/wiki/File:Wintercon_2016_Cosplay_of_Jason_Voorhees.jpg",
+          "license": "CC BY 2.0",
+          "author": "Rich.S.",
+          "verifiedAt": "2026-10-25"
+        }
+      ]
+    },
+    {
+      "id": "blurry-treats",
+      "name": "Blurry Treats",
+      "clues": [
+        {
+          "value": 200,
+          "kind": "image",
+          "file": "/games/fright-night/clues/b93622c087fa587b.jpg",
+          "mosaic": 24,
+          "prompt": "What treat is this?",
+          "choices": [
+            "Candy corn",
+            "Jelly beans",
+            "Circus peanuts",
+            "Gumdrops"
+          ],
+          "source": "https://commons.wikimedia.org/wiki/File:Candy-Corn.jpg",
+          "license": "Public domain",
+          "author": "Evan-Amos",
+          "verifiedAt": "2026-10-25"
+        },
+        {
+          "value": 400,
+          "kind": "image",
+          "file": "/games/fright-night/clues/095ab4cb2d88abe4.jpg",
+          "mosaic": 16,
+          "prompt": "What treat is this?",
+          "choices": [
+            "A caramel apple",
+            "A cake pop",
+            "A chocolate truffle",
+            "A scoop of ice cream"
+          ],
+          "source": "https://commons.wikimedia.org/wiki/File:Tastee-Candy-Apple-Red-Caramel-wPeanuts.jpg",
+          "license": "CC BY-SA 3.0",
+          "author": "Evan-Amos",
+          "verifiedAt": "2026-10-25"
+        },
+        {
+          "value": 600,
+          "kind": "image",
+          "file": "/games/fright-night/clues/e9ddd2b71625c496.jpg",
+          "mosaic": 20,
+          "prompt": "What treat is this?",
+          "choices": [
+            "Gummy worms",
+            "Sour belts",
+            "Licorice laces",
+            "Fruit leather strips"
+          ],
+          "source": "https://commons.wikimedia.org/wiki/File:Three_Nice!_Gummy_Worms_(19543065510).jpg",
+          "license": "CC BY-SA 2.0",
+          "author": "Willis Lam",
+          "verifiedAt": "2026-10-25"
+        },
+        {
+          "value": 800,
+          "kind": "image",
+          "file": "/games/fright-night/clues/5977846a2fc2d3c3.jpg",
+          "mosaic": 12,
+          "prompt": "What treat is this?",
+          "choices": [
+            "M&M's",
+            "Reese's Pieces",
+            "Skittles",
+            "Smarties",
+            "Starburst",
+            "Sour Patch Kids"
+          ],
+          "source": "https://commons.wikimedia.org/wiki/File:2019-01-29_18_07_51_A_packet_of_Peanut_M%26M%27s_in_the_Dulles_section_of_Sterling,_Loudoun_County,_Virginia.jpg",
+          "license": "CC BY-SA 4.0",
+          "author": "Famartin",
+          "verifiedAt": "2026-10-25"
+        },
+        {
+          "value": 1000,
+          "kind": "image",
+          "file": "/games/fright-night/clues/786b13d38fdb3e51.jpg",
+          "mosaic": 10,
+          "prompt": "What treat is this?",
+          "choices": [
+            "Snickers",
+            "Milky Way",
+            "Twix",
+            "3 Musketeers",
+            "Mars Bar",
+            "Baby Ruth"
+          ],
+          "source": "https://commons.wikimedia.org/wiki/File:2019-01-28_19_55_14_A_Snickers_bar_with_the_wrapper_still_intact_in_the_Dulles_section_of_Sterling,_Loudoun_County,_Virginia.jpg",
+          "license": "CC BY-SA 4.0",
+          "author": "Famartin",
+          "verifiedAt": "2026-10-25"
+        }
+      ]
+    },
+    {
+      "id": "monster-mash",
+      "name": "Monster Mash",
+      "clues": [
+        {
+          "value": 200,
+          "kind": "text",
+          "prompt": "This Transylvanian count first appeared in Bram Stoker's 1897 novel.",
+          "choices": [
+            "Dracula",
+            "Nosferatu",
+            "Lord Ruthven",
+            "Carmilla"
+          ],
+          "source": "https://en.wikipedia.org/wiki/Dracula",
+          "verifiedAt": "2026-10-25"
+        },
+        {
+          "value": 400,
+          "kind": "text",
+          "prompt": "In Mary Shelley's 1818 novel, this is the name of the scientist \u2014 not of the creature he makes.",
+          "choices": [
+            "Victor Frankenstein",
+            "Henry Frankenstein",
+            "Victor Moreau",
+            "Adam Walton"
+          ],
+          "source": "https://en.wikipedia.org/wiki/Frankenstein",
+          "verifiedAt": "2026-10-25"
+        },
+        {
+          "value": 600,
+          "kind": "text",
+          "prompt": "In Jewish folklore, this figure is shaped from clay and brought to life by an inscription or a word.",
+          "choices": [
+            "Golem",
+            "Dybbuk",
+            "Behemoth",
+            "Leviathan"
+          ],
+          "source": "https://en.wikipedia.org/wiki/Golem",
+          "verifiedAt": "2026-10-25"
+        },
+        {
+          "value": 800,
+          "kind": "text",
+          "prompt": "In Algonquian folklore, this creature is associated with winter, famine and insatiable greed.",
+          "choices": [
+            "Wendigo",
+            "Rougarou",
+            "Chupacabra",
+            "Kelpie",
+            "Selkie",
+            "Nisse"
+          ],
+          "source": "https://en.wikipedia.org/wiki/Wendigo",
+          "verifiedAt": "2026-10-25"
+        },
+        {
+          "value": 1000,
+          "kind": "text",
+          "prompt": "In Slavic folklore, this witch lives in a hut that stands on chicken legs.",
+          "choices": [
+            "Baba Yaga",
+            "Rusalka",
+            "Koschei",
+            "Domovoi",
+            "Leshy",
+            "Vila"
+          ],
+          "source": "https://en.wikipedia.org/wiki/Baba_Yaga",
+          "verifiedAt": "2026-10-25"
+        }
+      ]
+    },
+    {
+      "id": "reel-frights",
+      "name": "Reel Frights",
+      "clues": [
+        {
+          "value": 200,
+          "kind": "text",
+          "prompt": "John Carpenter's 1978 film introduced this masked killer stalking the town of Haddonfield.",
+          "choices": [
+            "Michael Myers",
+            "Jason Voorhees",
+            "Freddy Krueger",
+            "Norman Bates"
+          ],
+          "source": "https://en.wikipedia.org/wiki/Halloween_(1978_film)",
+          "verifiedAt": "2026-10-25"
+        },
+        {
+          "value": 400,
+          "kind": "text",
+          "prompt": "Michael Myers' mask in that film was a modified shop-bought mask of this Star Trek character.",
+          "choices": [
+            "Captain Kirk",
+            "Mr Spock",
+            "Doctor McCoy",
+            "Captain Picard"
+          ],
+          "source": "https://www.snopes.com/william-shatner-halloween-mask/",
+          "verifiedAt": "2026-10-25"
+        },
+        {
+          "value": 600,
+          "kind": "text",
+          "prompt": "Jason Voorhees did not put on his hockey mask until this entry in the Friday the 13th series.",
+          "choices": [
+            "Part III",
+            "the first film",
+            "Part II",
+            "Jason Lives"
+          ],
+          "source": "https://en.wikipedia.org/wiki/Friday_the_13th_Part_III",
+          "verifiedAt": "2026-10-25"
+        },
+        {
+          "value": 800,
+          "kind": "text",
+          "prompt": "Alfred Hitchcock's 1960 film Psycho is set at a roadside motel run by this character.",
+          "choices": [
+            "Norman Bates",
+            "Marion Crane",
+            "Sam Loomis",
+            "Lila Crane",
+            "Milton Arbogast",
+            "Norman Osborn"
+          ],
+          "source": "https://en.wikipedia.org/wiki/Psycho_(1960_film)",
+          "verifiedAt": "2026-10-25"
+        },
+        {
+          "value": 1000,
+          "kind": "text",
+          "prompt": "In Stanley Kubrick's film of The Shining, this is the number of the hotel room Danny is told to stay out of.",
+          "choices": [
+            "237",
+            "217",
+            "1408",
+            "101",
+            "113",
+            "666"
+          ],
+          "source": "https://en.wikipedia.org/wiki/The_Shining_(film)",
+          "verifiedAt": "2026-10-25"
+        }
+      ]
+    },
+    {
+      "id": "trick-or-treat",
+      "name": "Trick or Treat",
+      "clues": [
+        {
+          "value": 200,
+          "kind": "text",
+          "prompt": "Before pumpkins, jack-o'-lanterns in Ireland and Scotland were carved from this vegetable.",
+          "choices": [
+            "Turnip",
+            "Potato",
+            "Parsnip",
+            "Beetroot"
+          ],
+          "source": "https://en.wikipedia.org/wiki/Jack-o%27-lantern",
+          "verifiedAt": "2026-10-25"
+        },
+        {
+          "value": 400,
+          "kind": "text",
+          "prompt": "Halloween's roots are traced to this Gaelic festival marking the end of the harvest season.",
+          "choices": [
+            "Samhain",
+            "Beltane",
+            "Imbolc",
+            "Lughnasadh"
+          ],
+          "source": "https://en.wikipedia.org/wiki/Samhain",
+          "verifiedAt": "2026-10-25"
+        },
+        {
+          "value": 600,
+          "kind": "text",
+          "prompt": "Candy corn was originally sold under this decidedly unglamorous name.",
+          "choices": [
+            "Chicken Feed",
+            "Harvest Kernels",
+            "Corn Drops",
+            "Butter Nuggets"
+          ],
+          "source": "https://www.mentalfloss.com/article/648356/candy-corn-history",
+          "verifiedAt": "2026-10-25"
+        },
+        {
+          "value": 800,
+          "kind": "text",
+          "prompt": "The word Halloween is a contraction of this older name for the night before All Saints' Day.",
+          "choices": [
+            "All Hallows' Eve",
+            "All Souls' Night",
+            "Hallowmas",
+            "Allantide",
+            "Hallow Tide",
+            "Saints' Vigil"
+          ],
+          "source": "https://en.wikipedia.org/wiki/Halloween",
+          "verifiedAt": "2026-10-25"
+        },
+        {
+          "value": 1000,
+          "kind": "text",
+          "prompt": "In this country's Day of the Dead tradition, families build home altars known as ofrendas.",
+          "choices": [
+            "Mexico",
+            "Spain",
+            "Portugal",
+            "Peru",
+            "Guatemala",
+            "The Philippines"
+          ],
+          "source": "https://en.wikipedia.org/wiki/Day_of_the_Dead",
+          "verifiedAt": "2026-10-25"
+        }
+      ]
+    },
+    {
+      "id": "things-that-go-bump",
+      "name": "Things That Go Bump",
+      "clues": [
+        {
+          "value": 200,
+          "kind": "text",
+          "prompt": "A group of these nocturnal birds is traditionally called a parliament.",
+          "choices": [
+            "Owls",
+            "Ravens",
+            "Crows",
+            "Bats"
+          ],
+          "source": "https://en.wikipedia.org/wiki/List_of_English_terms_of_venery,_by_animal",
+          "verifiedAt": "2026-10-25"
+        },
+        {
+          "value": 400,
+          "kind": "text",
+          "prompt": "All three species of blood-feeding bat live in this part of the world.",
+          "choices": [
+            "Latin America",
+            "Sub-Saharan Africa",
+            "Southeast Asia",
+            "Northern Australia"
+          ],
+          "source": "https://en.wikipedia.org/wiki/Vampire_bat",
+          "verifiedAt": "2026-10-25"
+        },
+        {
+          "value": 600,
+          "kind": "text",
+          "prompt": "This California mansion, built by a rifle heiress, is famous for staircases that lead nowhere.",
+          "choices": [
+            "Winchester Mystery House",
+            "Whaley House",
+            "Hearst Castle",
+            "Castello di Amorosa"
+          ],
+          "source": "https://en.wikipedia.org/wiki/Winchester_Mystery_House",
+          "verifiedAt": "2026-10-25"
+        },
+        {
+          "value": 800,
+          "kind": "text",
+          "prompt": "In Irish folklore, this spirit's wailing is said to foretell a death in the family.",
+          "choices": [
+            "Banshee",
+            "Dullahan",
+            "P\u00faca",
+            "Changeling",
+            "Selkie",
+            "Leprechaun"
+          ],
+          "source": "https://en.wikipedia.org/wiki/Banshee",
+          "verifiedAt": "2026-10-25"
+        },
+        {
+          "value": 1000,
+          "kind": "text",
+          "prompt": "Stephenie Meyer set her 2005 vampire novel in this small, famously rainy Washington town.",
+          "choices": [
+            "Forks",
+            "Port Angeles",
+            "Bellingham",
+            "Sequim",
+            "Astoria",
+            "Coos Bay"
+          ],
+          "source": "https://en.wikipedia.org/wiki/Twilight_(Meyer_novel)",
+          "verifiedAt": "2026-10-25"
+        }
+      ]
+    }
+  ]
+}

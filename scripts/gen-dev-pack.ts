@@ -12,7 +12,8 @@
  *
  * Run: pnpm tsx scripts/gen-dev-pack.ts
  */
-import { mkdirSync, writeFileSync } from 'node:fs'
+import { createHash } from 'node:crypto'
+import { copyFileSync, mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { deflateSync } from 'node:zlib'
 import { choiceCountFor, type Pack } from '../packages/shared/src/fright-pack.js'
@@ -36,6 +37,20 @@ const COLOURS = [
 ]
 
 const OUT = join(process.cwd(), 'content', 'packs', 'dev')
+// Clue images are served by the web client, so they live in its static
+// assets and the pack stores the URL they will be fetched by. A bare
+// filename would resolve against the page and silently never load.
+const PUBLIC = join(
+  process.cwd(), 'packages', 'web', 'public', 'games', 'fright-night', 'clues')
+const URL_BASE = '/games/fright-night/clues'
+
+/** Copy under a content-hashed name and return its public URL. */
+function publish(source: string, bytes: Buffer): string {
+  const name = `${createHash('sha256').update(bytes).digest('hex').slice(0, 16)}.png`
+  mkdirSync(PUBLIC, { recursive: true })
+  copyFileSync(source, join(PUBLIC, name))
+  return `${URL_BASE}/${name}`
+}
 // Four rows, not two: choiceCountFor gives six options to the TOP TWO rows,
 // so a two-row board would be six-everywhere and would never exercise the
 // four-option grid. Four rows produce both counts with no special casing.
@@ -123,8 +138,12 @@ const DRAW: Record<string, (size: number, rgb: Rgb) => (x: number, y: number) =>
 mkdirSync(OUT, { recursive: true })
 
 const SIZE = 192
+const published: Record<string, string> = {}
 for (const shape of SHAPES) {
-  writeFileSync(join(OUT, `${shape.key}.png`), png(SIZE, SIZE, DRAW[shape.key]!(SIZE, shape.rgb)))
+  const bytes = png(SIZE, SIZE, DRAW[shape.key]!(SIZE, shape.rgb))
+  const local = join(OUT, `${shape.key}.png`)
+  writeFileSync(local, bytes)
+  published[shape.key] = publish(local, bytes)
 }
 
 const pack: Pack = {
@@ -138,7 +157,7 @@ const pack: Pack = {
       clues: SHAPES.map(shape => ({
         value: shape.value,
         kind: 'image' as const,
-        file: `${shape.key}.png`,
+        file: published[shape.key]!,
         // Deliberately coarse: a flat shape has to survive a real mosaic.
         // Coarser on the cheap rows, as on the real board: a flat shape has
         // to survive a real mosaic.

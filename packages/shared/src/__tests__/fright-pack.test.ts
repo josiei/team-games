@@ -200,14 +200,23 @@ describe('fiftyFifty', () => {
   })
 })
 
+/**
+ * A clue's `file` is the URL the browser requests, so "exists" means "is in
+ * the web client's static assets". Checking the pack directory would pass
+ * while every image 404s in the game.
+ */
+const PUBLIC = join(process.cwd(), 'packages', 'web', 'public')
+const servedImageExists = (file: string) =>
+  file.startsWith('/') && existsSync(join(PUBLIC, file.slice(1)))
+
 describe('the dev pack on disk', () => {
   // Every test, e2e run and load test plays this pack, so a broken one is a
   // broken suite rather than a broken game night.
   const dir = join(process.cwd(), 'content', 'packs', 'dev')
   const onDisk = JSON.parse(readFileSync(join(dir, 'pack.json'), 'utf8')) as Pack
 
-  it('validates against real files on disk', () => {
-    expect(validatePack(onDisk, file => existsSync(join(dir, file)))).toEqual([])
+  it('validates against the images the client will actually fetch', () => {
+    expect(validatePack(onDisk, servedImageExists)).toEqual([])
   })
 
   it('has one image category and one text category', () => {
@@ -219,5 +228,50 @@ describe('the dev pack on disk', () => {
   it('exercises both choice counts, so the grid layouts are covered', () => {
     const counts = new Set(onDisk.categories.flatMap(c => c.clues.map(k => k.choices.length)))
     expect(counts).toEqual(new Set([4, 6]))
+  })
+})
+
+describe('the Halloween pack on disk', () => {
+  // Structure only. No assertion here prints a prompt or a choice: the person
+  // who owns this repo is going to play this board.
+  const file = join(process.cwd(), 'content', 'packs', 'halloween', 'pack.json')
+  const onDisk = JSON.parse(readFileSync(file, 'utf8')) as Pack
+
+  it('validates against the images the client will actually fetch', () => {
+    expect(validatePack(onDisk, servedImageExists)).toEqual([])
+  })
+
+  it('is a full six-by-five board', () => {
+    expect(onDisk.values).toEqual([200, 400, 600, 800, 1000])
+    expect(onDisk.categories).toHaveLength(6)
+    for (const category of onDisk.categories) {
+      expect(category.clues).toHaveLength(5)
+    }
+  })
+
+  it('has two image categories and four of trivia', () => {
+    const kinds = onDisk.categories.map(c => c.clues[0]!.kind)
+    expect(kinds.filter(k => k === 'image')).toHaveLength(2)
+    expect(kinds.filter(k => k === 'text')).toHaveLength(4)
+  })
+
+  it('records a source and a verification date on every single clue', () => {
+    for (const category of onDisk.categories) {
+      for (const clue of category.clues) {
+        expect(clue.source, `${category.id}:${clue.value}`).toMatch(/^https?:\/\//)
+        expect(clue.verifiedAt, `${category.id}:${clue.value}`).toMatch(/^\d{4}-\d{2}-\d{2}$/)
+      }
+    }
+  })
+
+  it('never names an answer in an image filename', () => {
+    for (const category of onDisk.categories) {
+      for (const clue of category.clues) {
+        if (clue.kind !== 'image') continue
+        // Content-hashed: sixteen hex characters and an extension, nothing else.
+        expect(clue.file, `${category.id}:${clue.value}`)
+          .toMatch(/\/[0-9a-f]{16}\.(jpg|jpeg|png)$/)
+      }
+    }
   })
 })

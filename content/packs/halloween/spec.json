@@ -1,0 +1,150 @@
+{
+  "_note": "SPOILERS. Build input for the Halloween pack. Every mosaic here was chosen by rendering the image at that block count and looking at it: a 200 must be gettable, a 1000 must not be trivially so. The staging directory this points at is NOT committed - it held files named after their answers, which is exactly what the hashed filenames exist to avoid. To rebuild, re-fetch from the Commons pages recorded on each clue in pack.json (scripts/fetch-commons.py), then run scripts/build-pack-images.py content/packs/halloween/spec.json",
+  "id": "halloween-2026",
+  "name": "Halloween 2026",
+  "values": [
+    200,
+    400,
+    600,
+    800,
+    1000
+  ],
+  "stage": "content/packs/halloween/_final",
+  "trivia": "content/packs/halloween/trivia.json",
+  "out": "content/packs/halloween/pack.json",
+  "verifiedAt": "2026-10-25",
+  "imageCategories": [
+    {
+      "id": "whos-that-killer",
+      "name": "Who's That Killer?",
+      "prompt": "Who is this?",
+      "clues": [
+        {
+          "value": 200,
+          "slug": "freddy-krueger",
+          "mosaic": 10,
+          "choices": [
+            "Freddy Krueger",
+            "Michael Myers",
+            "Jason Voorhees",
+            "Ghostface"
+          ]
+        },
+        {
+          "value": 400,
+          "slug": "pennywise",
+          "mosaic": 12,
+          "choices": [
+            "Pennywise",
+            "Art the Clown",
+            "Captain Spaulding",
+            "Twisty the Clown"
+          ]
+        },
+        {
+          "value": 600,
+          "slug": "ghostface",
+          "mosaic": 14,
+          "choices": [
+            "Ghostface",
+            "Billy the Puppet",
+            "Michael Myers",
+            "Leatherface"
+          ]
+        },
+        {
+          "value": 800,
+          "slug": "michael-myers",
+          "mosaic": 18,
+          "choices": [
+            "Michael Myers",
+            "Jason Voorhees",
+            "Leatherface",
+            "Ghostface",
+            "Chucky",
+            "Billy the Puppet"
+          ]
+        },
+        {
+          "value": 1000,
+          "slug": "jason-voorhees",
+          "mosaic": 22,
+          "choices": [
+            "Jason Voorhees",
+            "Michael Myers",
+            "Leatherface",
+            "Ghostface",
+            "Jigsaw",
+            "Victor Crowley"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "blurry-treats",
+      "name": "Blurry Treats",
+      "prompt": "What treat is this?",
+      "clues": [
+        {
+          "value": 200,
+          "slug": "candy-corn",
+          "mosaic": 24,
+          "choices": [
+            "Candy corn",
+            "Jelly beans",
+            "Circus peanuts",
+            "Gumdrops"
+          ]
+        },
+        {
+          "value": 400,
+          "slug": "candy-apple",
+          "mosaic": 16,
+          "choices": [
+            "A caramel apple",
+            "A cake pop",
+            "A chocolate truffle",
+            "A scoop of ice cream"
+          ]
+        },
+        {
+          "value": 600,
+          "slug": "gummy-worms",
+          "mosaic": 20,
+          "choices": [
+            "Gummy worms",
+            "Sour belts",
+            "Licorice laces",
+            "Fruit leather strips"
+          ]
+        },
+        {
+          "value": 800,
+          "slug": "mms",
+          "mosaic": 12,
+          "choices": [
+            "M&M's",
+            "Reese's Pieces",
+            "Skittles",
+            "Smarties",
+            "Starburst",
+            "Sour Patch Kids"
+          ]
+        },
+        {
+          "value": 1000,
+          "slug": "snickers",
+          "mosaic": 10,
+          "choices": [
+            "Snickers",
+            "Milky Way",
+            "Twix",
+            "3 Musketeers",
+            "Mars Bar",
+            "Baby Ruth"
+          ]
+        }
+      ]
+    }
+  ]
+}

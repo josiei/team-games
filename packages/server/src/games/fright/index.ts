@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import {
@@ -14,6 +14,19 @@ export function packDir(packId: string): string {
   return join(REPO_ROOT, 'content', 'packs', packId)
 }
 
+/** Where the web client serves clue images from. */
+const PUBLIC_DIR = join(REPO_ROOT, 'packages', 'web', 'public')
+
+/**
+ * A clue's `file` is the public URL the browser will request, so "does this
+ * exist" means "is it in the web client's static assets". Checking the pack
+ * directory instead would pass while every image 404s in the game.
+ */
+function clueImageExists(file: string): boolean {
+  if (!file.startsWith('/')) return false
+  return existsSync(join(PUBLIC_DIR, file.slice(1)))
+}
+
 /**
  * Read a pack off disk and refuse to start with a broken one.
  *
@@ -23,7 +36,7 @@ export function packDir(packId: string): string {
 export function loadPack(packId: string): Pack {
   const dir = packDir(packId)
   const pack = JSON.parse(readFileSync(join(dir, 'pack.json'), 'utf8')) as Pack
-  const problems = validatePack(pack, () => true)
+  const problems = validatePack(pack, clueImageExists)
   if (problems.length > 0) {
     // Validator messages name a clue by category and value, never by its text,
     // so this is safe to print in a terminal the repo's owner is reading.
@@ -112,8 +125,15 @@ export const frightNightDev = makeFrightModule({
   hidden: true,
 })
 
-// The real `fright-night` module is registered alongside its pack, once that
-// pack exists and has been verified. Registering it against a placeholder
-// would mean a half-written board could reach the picker without anyone
-// noticing, and the one thing this game cannot survive is shipping content
-// nobody checked.
+/**
+ * The real thing: thirty verified clues over six categories.
+ *
+ * It is registered only now, with its pack — a module pointing at a
+ * placeholder would have let a half-written board reach the picker, and
+ * unverified content is this game's defining failure.
+ */
+export const frightNight = makeFrightModule({
+  id: 'fright-night',
+  name: 'Fright Night',
+  pack: loadPack('halloween'),
+})

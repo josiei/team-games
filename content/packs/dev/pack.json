@@ -15,7 +15,7 @@
         {
           "value": 100,
           "kind": "image",
-          "file": "triangle.png",
+          "file": "/games/fright-night/clues/f9554e94ef00b4e5.png",
           "mosaic": 8,
           "prompt": "Which shape is this?",
           "choices": [
@@ -30,7 +30,7 @@
         {
           "value": 200,
           "kind": "image",
-          "file": "circle.png",
+          "file": "/games/fright-night/clues/1e5c396c82012f0a.png",
           "mosaic": 11,
           "prompt": "Which shape is this?",
           "choices": [
@@ -45,7 +45,7 @@
         {
           "value": 300,
           "kind": "image",
-          "file": "square.png",
+          "file": "/games/fright-night/clues/fb418dae1f655bde.png",
           "mosaic": 14,
           "prompt": "Which shape is this?",
           "choices": [
@@ -62,7 +62,7 @@
         {
           "value": 400,
           "kind": "image",
-          "file": "diamond.png",
+          "file": "/games/fright-night/clues/93de07d85d1c3035.png",
           "mosaic": 17,
           "prompt": "Which shape is this?",
           "choices": [
