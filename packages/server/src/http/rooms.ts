@@ -17,11 +17,14 @@ export type AppDeps = {
 export function registerRoomRoutes(app: FastifyInstance, deps: AppDeps): void {
   const { repo, store, runtimes } = deps
 
+  // Hidden games stay reachable by id (tests create rooms on them) but are
+  // never offered in the picker.
   app.get('/api/games', async () =>
-    GAMES.map(g => ({
+    GAMES.filter(g => !g.hidden).map(g => ({
       id: g.id, name: g.name, description: g.description,
       minPlayers: g.minPlayers, maxPlayers: g.maxPlayers,
       estimatedMinutes: g.estimatedMinutes, theme: g.theme,
+      thumbnail: g.thumbnail, ...(g.teams ? { teams: g.teams } : {}),
     })))
 
   app.post('/api/rooms', async (request, reply) => {

@@ -41,6 +41,20 @@ describe('GET /api/games', () => {
     expect(games.map(g => g.id)).toContain('pumpkin-carve')
     expect(games[0]!.theme).toBeDefined()
   })
+
+  it('carries a thumbnail for every game, so the picker is never half-empty', async () => {
+    const res = await app.inject({ method: 'GET', url: '/api/games' })
+    const games = res.json() as { id: string; thumbnail?: string }[]
+    expect(games.length).toBeGreaterThan(0)
+    for (const game of games) expect(game.thumbnail).toMatch(/^\/games\/.+/)
+  })
+
+  it('lists no teams for a game that declares none', async () => {
+    const res = await app.inject({ method: 'GET', url: '/api/games' })
+    const pumpkin = (res.json() as { id: string; teams?: unknown[] }[])
+      .find(g => g.id === 'pumpkin-carve')!
+    expect(pumpkin.teams).toBeUndefined()
+  })
 })
 
 describe('POST /api/rooms', () => {

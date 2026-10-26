@@ -11,6 +11,7 @@ export const pumpkinModule: GameModule<PumpkinState, PumpkinAction, PumpkinView>
   minPlayers: 2,
   maxPlayers: 16,
   estimatedMinutes: 6,
+  thumbnail: '/games/pumpkin-carve/thumb.png',
   phases: PUMPKIN_PHASES,
 
   theme: { accent: '#FF7518', accent2: '#8B5CF6', glow: '#FFC24D', danger: '#84CC16' },

@@ -96,6 +96,20 @@ export interface GameModule<State, Action, View> {
    * accepting one it will never use.
    */
   readonly teams?: readonly { id: string; name: string; color: string }[]
+
+  /**
+   * Path to the card art the game picker shows, under the web client's static
+   * assets. Required: a picker with a blank card reads as broken, so a game
+   * without art ships a placeholder rather than nothing.
+   */
+  readonly thumbnail: string
+
+  /**
+   * Keep this game out of the picker. Used for a module that exists only for
+   * tests — a dev-content twin of a real game — which must be reachable by id
+   * but must never be offered to players.
+   */
+  readonly hidden?: boolean
 }
 
 /**
