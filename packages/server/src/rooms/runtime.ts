@@ -19,6 +19,17 @@ type Send = (to: PlayerId, message: ServerMessage) => void
  */
 export const EARLY_ADVANCE_MS = 700
 
+/**
+ * The most phase transitions one room may make before we call it a loop.
+ *
+ * An index walk over `phases` could not revisit a phase, so it was its own
+ * bound. `GameModule.nextPhase` can, which is the point of it — but a module
+ * that returns its own phase, or two that return each other, would spin. The
+ * largest honest game we have is a 30-tile board at six phases a tile, so a few
+ * hundred is a real game and this is a bug.
+ */
+export const MAX_PHASE_HOPS = 500
+
 export class RoomRuntime {
   private readonly room: LiveRoom
   private readonly store: RoomStore
@@ -32,6 +43,8 @@ export class RoomRuntime {
   private earlyTimer: ReturnType<typeof setTimeout> | null = null
   private readonly moduleTimers = new Set<ReturnType<typeof setTimeout>>()
   private phaseEndsAt: number | null = null
+  /** Phases entered so far, against MAX_PHASE_HOPS. */
+  private hops = 0
   private started = false
   private disposed = false
   private failed = false
@@ -92,6 +105,10 @@ export class RoomRuntime {
     if (!('type' in action) || typeof action.type !== 'string') return
     if (!this.room.players.has(by)) return
 
+    // Read hostId now, not at start: the host moves when one disconnects, and
+    // the privilege has to move with it.
+    if (this.module.hostActions?.includes(action.type) && by !== this.room.hostId) return
+
     // `by` comes from the authenticated socket. Any `by` in the payload is ignored.
     // A module's reducer may not recognise the action (or choke on its shape);
     // either way the state must survive untouched.
@@ -106,6 +123,14 @@ export class RoomRuntime {
       return
     }
     if (next === undefined || next === null) return
+
+    // Reference equality means the reducer rejected the action. Every guard
+    // in a pure reducer bails this way, and losing a buzzer race is the
+    // commonest path of all — persisting and re-broadcasting the whole state
+    // for each losing press would load the event loop with exactly the
+    // traffic that decides who got there first.
+    if (next === this.room.state) return
+
     this.room.state = next
 
     // Persist before the early returns below, so DRAFT saves too and an
@@ -130,9 +155,35 @@ export class RoomRuntime {
   /** True when the room advanced or is already terminal; false if entering the next phase failed. */
   private tryAdvance(): boolean {
     if (this.disposed || !this.started) return true
-    const index = this.module.phases.indexOf(this.room.phase)
-    const next = this.module.phases[index + 1]
+
+    let next: string | undefined
+    if (this.module.nextPhase) {
+      // The module decides. null means "stop here", which is terminal, not a
+      // failure. A name outside `phases` is a module bug: fall through to the
+      // false below so the caller fails the room instead of stalling it.
+      const chosen = this.module.nextPhase(this.room.state, this.room.phase)
+      if (chosen === null) return true
+      if (!this.module.phases.includes(chosen)) {
+        // Fail here rather than returning false: only the phase-clock path
+        // checks tryAdvance's result, so a module calling ctx.advancePhase()
+        // would otherwise stall the room in silence. Returning true afterwards
+        // keeps a checking caller from failing an already-failed room twice.
+        this.failRoom(`nextPhase returned ${logSafe(chosen)}, which is not a phase`)
+        return true
+      }
+      next = chosen
+    } else {
+      const index = this.module.phases.indexOf(this.room.phase)
+      next = this.module.phases[index + 1]
+    }
     if (!next) return true
+
+    // The room is terminal once this fires, so report success: returning false
+    // would have the caller fail an already-failed room a second time.
+    if (this.hops >= MAX_PHASE_HOPS) {
+      this.failRoom(`phase hop budget of ${MAX_PHASE_HOPS} exhausted`)
+      return true
+    }
     return this.enterPhase(next)
   }
 
@@ -185,7 +236,10 @@ export class RoomRuntime {
 
   snapshotFor(playerId: PlayerId): ServerMessage {
     const players = [...this.room.players.values()].map(p =>
-      ({ id: p.id, displayName: p.displayName, connected: p.connected, joinedAt: p.joinedAt }))
+      ({
+        id: p.id, displayName: p.displayName, connected: p.connected,
+        joinedAt: p.joinedAt, avatar: p.avatar, team: p.team,
+      }))
     return {
       type: 'snapshot',
       phase: this.room.phase,
@@ -202,6 +256,7 @@ export class RoomRuntime {
       // Branded PlayerId keys are not assignable to string keys; cast here only.
       labels: labelPlayers(players) as Record<string, string>,
       hostId: this.room.hostId,
+      ...(this.module.teams ? { teams: this.module.teams } : {}),
     }
   }
 
@@ -277,6 +332,7 @@ export class RoomRuntime {
 
     this.room.phase = phase
     this.room.state = nextState
+    this.hops += 1
 
     // The deadline is part of authoritative state and rides in every snapshot,
     // so no later snapshot can wipe it.

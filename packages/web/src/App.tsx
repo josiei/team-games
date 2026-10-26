@@ -6,6 +6,7 @@ import { Lobby } from './lobby/Lobby.js'
 import { CarveScreen } from './games/pumpkin/CarveScreen.js'
 import { VoteScreen } from './games/pumpkin/VoteScreen.js'
 import { ResultsScreen } from './games/pumpkin/ResultsScreen.js'
+import { FrightGame } from './games/fright/FrightGame.js'
 import { errorCode, humanize, joinRoom } from './lobby/api.js'
 import { clearSession, loadSession, saveSession, type StoredSession } from './lobby/session.js'
 
@@ -53,7 +54,9 @@ export function ErrorBanner() {
 
 function Router() {
   const status = useConnection(s => s.status)
-  const view = useConnection(s => s.view) as PumpkinView | null
+  // Two games now, so the router sees either game's view; each branch
+  // narrows to its own shape after checking the discriminant.
+  const view = useConnection(s => s.view) as ({ kind: string } & PumpkinView) | null
   const connect = useConnection(s => s.connect)
   const disconnect = useConnection(s => s.disconnect)
 
@@ -137,6 +140,21 @@ function Router() {
     )
   }
 
+  // The room is gone for good: the server restarted (rooms live in memory) or
+  // it expired. Say so and clear the session, rather than leaving the last
+  // snapshot on screen looking like a live game.
+  if (status === 'room-gone') {
+    return (
+      <main style={{ maxWidth: 420, margin: '12vh auto', padding: 16 }}>
+        <p role="alert">
+          This room has ended. The server may have restarted &mdash; rooms are not
+          kept once it stops.
+        </p>
+        <button onClick={leave}>Back to the start</button>
+      </main>
+    )
+  }
+
   if (status === 'taken-over') {
     // The session is deliberately KEPT: localStorage is shared with the tab that
     // took over, and re-joining with the token reclaims the player (the new
@@ -155,6 +173,10 @@ function Router() {
   }
   // The room code is the public salt every client shares, so each slot gets the
   // same pumpkin on every screen without a field having to travel.
+  // Fright Night's own screens. Its view kinds are prefixed precisely so this
+  // stays a check on the discriminant: both games would otherwise call their
+  // last screen 'results'.
+  if (view.kind.startsWith('fright-')) return <FrightGame onLeave={leave} />
   if (view.kind === 'carving') return <CarveScreen roomId={identity.roomId} code={identity.code} />
   if (view.kind === 'voting' || view.kind === 'spectator') return <VoteScreen code={identity.code} />
   if (view.kind === 'results') {

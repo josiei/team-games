@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify'
-import { generateCode, newId, normalizeCode, type RoomId } from '@tg/shared'
+import { generateCode, isAvatarId, newId, normalizeCode, type RoomId } from '@tg/shared'
 import { GAMES, getGame } from '../games/registry.js'
 import { RoomRuntime } from '../rooms/runtime.js'
 import type { InMemoryRoomStore } from '../rooms/store.js'
@@ -17,11 +17,14 @@ export type AppDeps = {
 export function registerRoomRoutes(app: FastifyInstance, deps: AppDeps): void {
   const { repo, store, runtimes } = deps
 
+  // Hidden games stay reachable by id (tests create rooms on them) but are
+  // never offered in the picker.
   app.get('/api/games', async () =>
-    GAMES.map(g => ({
+    GAMES.filter(g => !g.hidden).map(g => ({
       id: g.id, name: g.name, description: g.description,
       minPlayers: g.minPlayers, maxPlayers: g.maxPlayers,
       estimatedMinutes: g.estimatedMinutes, theme: g.theme,
+      thumbnail: g.thumbnail, ...(g.teams ? { teams: g.teams } : {}),
     })))
 
   app.post('/api/rooms', async (request, reply) => {
@@ -84,6 +87,55 @@ export function registerRoomRoutes(app: FastifyInstance, deps: AppDeps): void {
     return { roomId: live.id, playerId: player.id, playerToken: token }
   })
 
+  /**
+   * The lobby profile: avatar and team, both chosen before the game starts.
+   *
+   * Validated against the avatar set and against THIS game's declared teams,
+   * because whatever lands here renders in every other player's lobby. A game
+   * that declares no teams rejects every team id, which is why passing one to
+   * pumpkin-carve is an error rather than a no-op.
+   */
+  app.post('/api/rooms/:code/me', async (request, reply) => {
+    const code = normalizeCode((request.params as { code: string }).code)
+    const { playerToken, avatar, team } =
+      (request.body ?? {}) as { playerToken?: unknown; avatar?: unknown; team?: unknown }
+
+    const live = store.byCode(code)
+    if (!live) return reply.code(404).send({ code: 'ROOM_NOT_FOUND' })
+
+    const caller = typeof playerToken === 'string' && playerToken.length > 0
+      ? [...live.players.values()].find(p => p.token === playerToken)
+      : undefined
+    if (!caller) return reply.code(403).send({ code: 'NOT_A_PLAYER' })
+
+    // The roster is frozen into game state at createState, so a later change
+    // would show in the lobby and mean nothing in the game. Say so instead.
+    if (live.state !== null || runtimes.get(live.id)?.hasStarted) {
+      return reply.code(409).send({ code: 'ALREADY_STARTED' })
+    }
+
+    const patch: { avatar?: string; team?: string | null } = {}
+    if (avatar !== undefined) {
+      if (!isAvatarId(avatar)) return reply.code(400).send({ code: 'BAD_AVATAR' })
+      patch.avatar = avatar
+    }
+    if (team !== undefined) {
+      const declared = getGame(live.gameId)?.teams ?? []
+      const ok = team === null || (typeof team === 'string' && declared.some(t => t.id === team))
+      if (!ok) return reply.code(400).send({ code: 'BAD_TEAM' })
+      patch.team = team
+    }
+    if (Object.keys(patch).length === 0) return { ok: true }
+
+    store.setProfile(live, caller.id, patch)
+    repo.setProfile(live.workspaceId, caller.id, patch)
+    // Everyone's lobby needs to see the change; onConnect re-broadcasts and is
+    // idempotent for an already-connected player.
+    runtimes.get(live.id)?.onConnect(caller.id)
+
+    return { ok: true }
+  })
+
   app.post('/api/rooms/:code/start', async (request, reply) => {
     const code = normalizeCode((request.params as { code: string }).code)
     const { playerToken } = (request.body ?? {}) as { playerToken?: string }
@@ -97,8 +149,20 @@ export function registerRoomRoutes(app: FastifyInstance, deps: AppDeps): void {
     }
 
     const game = getGame(live.gameId)!
-    if (store.participants(live).length < game.minPlayers) {
+    const participants = store.participants(live)
+    if (participants.length < game.minPlayers) {
       return reply.code(409).send({ code: 'NOT_ENOUGH_PLAYERS' })
+    }
+
+    // The lobby disables its start button on the same condition, but a button
+    // is not a rule. The roster freezes at createState, so a game begun with
+    // an empty team cannot be repaired: control alternates onto a side that
+    // can never pick, and the board plays itself out to a 0-0 tie.
+    if (game.teams?.length) {
+      const held = new Set(participants.map(p => p.team))
+      if (!game.teams.every(t => held.has(t.id))) {
+        return reply.code(409).send({ code: 'TEAMS_INCOMPLETE' })
+      }
     }
 
     // Reject before creating anything: a restored room (state present, runtime

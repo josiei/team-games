@@ -18,6 +18,7 @@ export type RoomRow = {
 export type PlayerRow = {
   id: PlayerId; roomId: RoomId; workspaceId: WorkspaceId
   displayName: string; token: string; connected: boolean; joinedAt: number
+  avatar: string; team: string | null
 }
 
 export type GameResultRow = {
@@ -119,6 +120,8 @@ export class Repo {
       token: input.token,
       connected: true,
       joinedAt: input.joinedAt ?? Date.now(),
+      avatar: '',
+      team: null,
     }
     this.db.insert(players).values(row).run()
     return row as unknown as PlayerRow
@@ -135,6 +138,20 @@ export class Repo {
     return this.db.select().from(players)
       .where(and(eq(players.workspaceId, workspaceId), eq(players.roomId, roomId)))
       .all() as unknown as PlayerRow[]
+  }
+
+  /** Lobby profile. An omitted field is left as it was; `team: null` clears it. */
+  setProfile(
+    workspaceId: WorkspaceId,
+    playerId: PlayerId,
+    patch: { avatar?: string; team?: string | null },
+  ) {
+    const set: { avatar?: string; team?: string | null } = {}
+    if (patch.avatar !== undefined) set.avatar = patch.avatar
+    if (patch.team !== undefined) set.team = patch.team
+    if (Object.keys(set).length === 0) return
+    this.db.update(players).set(set)
+      .where(and(eq(players.workspaceId, workspaceId), eq(players.id, playerId))).run()
   }
 
   setConnected(workspaceId: WorkspaceId, playerId: PlayerId, connected: boolean) {

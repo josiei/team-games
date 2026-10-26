@@ -1,5 +1,5 @@
 import type { PlayerId } from './ids.js'
-import type { Player } from './game.js'
+import type { Player, Team } from './game.js'
 
 export type ServerMessage =
   | {
@@ -13,6 +13,12 @@ export type ServerMessage =
       endsAt: number | null
       /** Server clock at send time, so clients can correct for skew. */
       serverNow: number
+      /**
+       * Teams this room's game declares, absent for a game played by
+       * individuals. The lobby is shared across games and has no other way
+       * to know, so it rides along rather than costing a second request.
+       */
+      teams?: readonly Team[]
     }
   | { type: 'host'; line: string }
   | { type: 'error'; code: string; message: string }

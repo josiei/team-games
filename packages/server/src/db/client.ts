@@ -30,7 +30,8 @@ CREATE TABLE IF NOT EXISTS player (
   workspace_id TEXT NOT NULL REFERENCES workspace(id),
   display_name TEXT NOT NULL, user_id TEXT REFERENCES user(id),
   token TEXT NOT NULL,
-  connected INTEGER NOT NULL DEFAULT 1, joined_at INTEGER NOT NULL);
+  connected INTEGER NOT NULL DEFAULT 1, joined_at INTEGER NOT NULL,
+  avatar TEXT NOT NULL DEFAULT '', team TEXT);
 CREATE INDEX IF NOT EXISTS player_token_idx ON player(workspace_id, token);
 CREATE TABLE IF NOT EXISTS game_result (
   id TEXT PRIMARY KEY, room_id TEXT NOT NULL REFERENCES room(id),
@@ -60,6 +61,14 @@ export function createDb(url: string) {
   }
   if (!cols.some(c => c.name === 'ends_at')) {
     sqlite.exec('ALTER TABLE room_snapshot ADD COLUMN ends_at INTEGER')
+  }
+  // player predates the lobby profile; add it to older files the same way.
+  const playerCols = sqlite.pragma('table_info(player)') as { name: string }[]
+  if (!playerCols.some(c => c.name === 'avatar')) {
+    sqlite.exec("ALTER TABLE player ADD COLUMN avatar TEXT NOT NULL DEFAULT ''")
+  }
+  if (!playerCols.some(c => c.name === 'team')) {
+    sqlite.exec('ALTER TABLE player ADD COLUMN team TEXT')
   }
   return drizzle(sqlite, { schema })
 }

@@ -41,6 +41,20 @@ describe('GET /api/games', () => {
     expect(games.map(g => g.id)).toContain('pumpkin-carve')
     expect(games[0]!.theme).toBeDefined()
   })
+
+  it('carries a thumbnail for every game, so the picker is never half-empty', async () => {
+    const res = await app.inject({ method: 'GET', url: '/api/games' })
+    const games = res.json() as { id: string; thumbnail?: string }[]
+    expect(games.length).toBeGreaterThan(0)
+    for (const game of games) expect(game.thumbnail).toMatch(/^\/games\/.+/)
+  })
+
+  it('lists no teams for a game that declares none', async () => {
+    const res = await app.inject({ method: 'GET', url: '/api/games' })
+    const pumpkin = (res.json() as { id: string; teams?: unknown[] }[])
+      .find(g => g.id === 'pumpkin-carve')!
+    expect(pumpkin.teams).toBeUndefined()
+  })
 })
 
 describe('POST /api/rooms', () => {
@@ -290,5 +304,171 @@ describe('robustness', () => {
       method: 'POST', url: `/api/rooms/${code}/join`, payload: { displayName: 42 },
     })
     expect(res.statusCode).toBe(400)
+  })
+})
+
+describe('POST /api/rooms/:code/me', () => {
+  const setProfile = async (code: string, payload: Record<string, unknown>) =>
+    await app.inject({ method: 'POST', url: `/api/rooms/${code}/me`, payload })
+
+  it('stores a chosen avatar on the live player and in the database', async () => {
+    const room = await createRoom()
+    const { playerId, playerToken } = (await join(room.code, 'Jocelyn')).json()
+    const res = await setProfile(room.code, { playerToken, avatar: 'vampire' })
+    expect(res.statusCode).toBe(200)
+
+    const live = store.byCode(asRoomCode(room.code))!
+    expect(live.players.get(playerId)!.avatar).toBe('vampire')
+    const stored = repo.listPlayers(live.workspaceId, live.id).find(p => p.id === playerId)!
+    expect(stored.avatar).toBe('vampire')
+  })
+
+  it('rejects an unknown room code with ROOM_NOT_FOUND', async () => {
+    const res = await setProfile('ZZ9ZZ9', { playerToken: 'nope', avatar: 'ghost' })
+    expect(res.statusCode).toBe(404)
+    expect(res.json().code).toBe('ROOM_NOT_FOUND')
+  })
+
+  it('rejects an unknown playerToken with NOT_A_PLAYER', async () => {
+    const room = await createRoom()
+    await join(room.code, 'Jocelyn')
+    const res = await setProfile(room.code, { playerToken: 'not-a-token', avatar: 'ghost' })
+    expect(res.statusCode).toBe(403)
+    expect(res.json().code).toBe('NOT_A_PLAYER')
+  })
+
+  it('rejects a profile change after the game has started with ALREADY_STARTED', async () => {
+    const room = await createRoom()
+    const host = (await join(room.code, 'Jocelyn')).json()
+    await join(room.code, 'Sam')
+    await app.inject({
+      method: 'POST', url: `/api/rooms/${room.code}/start`,
+      payload: { playerToken: host.playerToken },
+    })
+    const res = await setProfile(room.code, { playerToken: host.playerToken, avatar: 'bat' })
+    expect(res.statusCode).toBe(409)
+    expect(res.json().code).toBe('ALREADY_STARTED')
+  })
+
+  // An unchecked string here renders in every other player's lobby.
+  it('rejects an avatar id that is not in AVATARS with BAD_AVATAR', async () => {
+    const room = await createRoom()
+    const { playerId, playerToken } = (await join(room.code, 'Jocelyn')).json()
+    const res = await setProfile(room.code, { playerToken, avatar: '<img src=x>' })
+    expect(res.statusCode).toBe(400)
+    expect(res.json().code).toBe('BAD_AVATAR')
+    expect(store.byCode(asRoomCode(room.code))!.players.get(playerId)!.avatar).toBe('')
+  })
+
+  it('rejects a team the selected game does not declare with BAD_TEAM', async () => {
+    // pumpkin-carve declares no teams at all, so every team id is wrong for it.
+    const room = await createRoom()
+    const { playerId, playerToken } = (await join(room.code, 'Jocelyn')).json()
+    const res = await setProfile(room.code, { playerToken, team: 'blue' })
+    expect(res.statusCode).toBe(400)
+    expect(res.json().code).toBe('BAD_TEAM')
+    expect(store.byCode(asRoomCode(room.code))!.players.get(playerId)!.team).toBeNull()
+  })
+
+  it('allows team: null, which clears the team', async () => {
+    const room = await createRoom()
+    const { playerId, playerToken } = (await join(room.code, 'Jocelyn')).json()
+    const res = await setProfile(room.code, { playerToken, team: null })
+    expect(res.statusCode).toBe(200)
+    expect(store.byCode(asRoomCode(room.code))!.players.get(playerId)!.team).toBeNull()
+  })
+})
+
+// Deferred from Tasks 4 and 5: both needed a registered game that declares
+// teams and a registered game that is hidden.
+describe('a game that declares teams', () => {
+  const createFright = async () => {
+    const res = await app.inject({
+      method: 'POST', url: '/api/rooms', payload: { gameId: 'fright-night-dev' },
+    })
+    return res.json() as { code: string; roomId: string }
+  }
+
+  it('GET /api/games omits a module marked hidden', async () => {
+    const res = await app.inject({ method: 'GET', url: '/api/games' })
+    const ids = (res.json() as { id: string }[]).map(g => g.id)
+    expect(ids).toContain('pumpkin-carve')
+    expect(ids).not.toContain('fright-night-dev')
+  })
+
+  it('accepts a team the game declares', async () => {
+    const room = await createFright()
+    const { playerId, playerToken } = (await join(room.code, 'Jocelyn')).json()
+    const res = await app.inject({
+      method: 'POST', url: `/api/rooms/${room.code}/me`,
+      payload: { playerToken, team: 'blue', avatar: 'vampire' },
+    })
+    expect(res.statusCode).toBe(200)
+    const live = store.byCode(asRoomCode(room.code))!
+    expect(live.players.get(playerId)).toMatchObject({ team: 'blue', avatar: 'vampire' })
+  })
+
+  it('still rejects a team it does not declare', async () => {
+    const room = await createFright()
+    const { playerToken } = (await join(room.code, 'Jocelyn')).json()
+    const res = await app.inject({
+      method: 'POST', url: `/api/rooms/${room.code}/me`,
+      payload: { playerToken, team: 'green' },
+    })
+    expect(res.statusCode).toBe(400)
+    expect(res.json().code).toBe('BAD_TEAM')
+  })
+})
+
+describe('starting a team game', () => {
+  const createFrightRoom = async () => {
+    const res = await app.inject({
+      method: 'POST', url: '/api/rooms', payload: { gameId: 'fright-night-dev' },
+    })
+    return res.json() as { code: string }
+  }
+  const setTeam = (code: string, playerToken: string, team: string | null) =>
+    app.inject({
+      method: 'POST', url: `/api/rooms/${code}/me`, payload: { playerToken, team },
+    })
+  const start = (code: string, playerToken: string) =>
+    app.inject({ method: 'POST', url: `/api/rooms/${code}/start`, payload: { playerToken } })
+
+  it('refuses to start while a declared team is empty', async () => {
+    // The lobby disables the button, but the button is not the rule.
+    const room = await createFrightRoom()
+    const host = (await join(room.code, 'Jocelyn')).json()
+    const guest = (await join(room.code, 'Sam')).json()
+    await setTeam(room.code, host.playerToken, 'blue')
+    await setTeam(room.code, guest.playerToken, 'blue')
+
+    const res = await start(room.code, host.playerToken)
+    expect(res.statusCode).toBe(409)
+    expect(res.json().code).toBe('TEAMS_INCOMPLETE')
+  })
+
+  it('refuses to start when nobody has picked a team at all', async () => {
+    const room = await createFrightRoom()
+    const host = (await join(room.code, 'Jocelyn')).json()
+    await join(room.code, 'Sam')
+    const res = await start(room.code, host.playerToken)
+    expect(res.statusCode).toBe(409)
+    expect(res.json().code).toBe('TEAMS_INCOMPLETE')
+  })
+
+  it('starts once every team has somebody', async () => {
+    const room = await createFrightRoom()
+    const host = (await join(room.code, 'Jocelyn')).json()
+    const guest = (await join(room.code, 'Sam')).json()
+    await setTeam(room.code, host.playerToken, 'blue')
+    await setTeam(room.code, guest.playerToken, 'red')
+    expect((await start(room.code, host.playerToken)).statusCode).toBe(200)
+  })
+
+  it('a game with no declared teams is unaffected', async () => {
+    const room = await createRoom()
+    const host = (await join(room.code, 'Jocelyn')).json()
+    await join(room.code, 'Sam')
+    expect((await start(room.code, host.playerToken)).statusCode).toBe(200)
   })
 })

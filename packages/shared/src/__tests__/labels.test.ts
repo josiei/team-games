@@ -3,7 +3,7 @@ import { labelPlayers } from '../game.js'
 import { asPlayerId } from '../ids.js'
 
 const p = (id: string, displayName: string, joinedAt: number) =>
-  ({ id: asPlayerId(id), displayName, connected: true, joinedAt })
+  ({ id: asPlayerId(id), displayName, connected: true, joinedAt, avatar: '', team: null })
 
 describe('labelPlayers', () => {
   it('leaves unique names alone', () => {

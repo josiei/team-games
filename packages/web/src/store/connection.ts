@@ -1,7 +1,15 @@
 import { create } from 'zustand'
-import type { ClientMessage, Player, PlayerId, ServerMessage } from '@tg/shared'
+import type { ClientMessage, Player, PlayerId, ServerMessage, Team } from '@tg/shared'
 
-export type Status = 'idle' | 'connecting' | 'open' | 'reconnecting' | 'closed' | 'taken-over'
+export type Status =
+  | 'idle' | 'connecting' | 'open' | 'reconnecting' | 'closed' | 'taken-over'
+  /** The room no longer exists, or this token is not in it. Terminal. */
+  | 'room-gone'
+
+/** Socket close codes the server uses, mirrored from transport/socket.ts. */
+const CLOSE_REPLACED = 4001
+const CLOSE_BAD_TOKEN = 4003
+const CLOSE_NO_ROOM = 4004
 
 type State = {
   status: Status
@@ -10,6 +18,13 @@ type State = {
   players: Player[]
   labels: Record<string, string>
   hostId: PlayerId | null
+  /**
+   * Teams this room's game declares; undefined for a game without them.
+   * A required key holding `| undefined` rather than an optional one:
+   * exactOptionalPropertyTypes forbids assigning undefined to an optional
+   * key, and every snapshot sets this field one way or the other.
+   */
+  teams: readonly Team[] | undefined
   hostLine: string | null
   endsAt: number | null
   clockOffset: number
@@ -57,6 +72,7 @@ export const useConnection = create<State & Actions>((set, get) => ({
   players: [],
   labels: {},
   hostId: null,
+  teams: undefined,
   hostLine: null,
   endsAt: null,
   clockOffset: 0,
@@ -92,9 +108,16 @@ export const useConnection = create<State & Actions>((set, get) => ({
     ws.onclose = event => {
       if (socket !== ws) return   // stale socket: not ours any more
       socket = null
-      if (event.code === 4001) {   // replaced by another tab: terminal
+      if (event.code === CLOSE_REPLACED) {   // replaced by another tab: terminal
         lastArgs = null
         return set({ status: 'taken-over' })
+      }
+      // The room is gone — the server restarted, or it expired. Rooms live in
+      // memory, so it is never coming back and retrying forever would leave
+      // the last snapshot on screen looking like a live game.
+      if (event.code === CLOSE_NO_ROOM || event.code === CLOSE_BAD_TOKEN) {
+        lastArgs = null
+        return set({ status: 'room-gone' })
       }
       if (!lastArgs) return set({ status: 'closed' })
       set({ status: 'reconnecting' })
@@ -139,6 +162,7 @@ export const useConnection = create<State & Actions>((set, get) => ({
           players: message.players,
           labels: message.labels,
           hostId: message.hostId,
+          teams: message.teams,
           endsAt: message.endsAt,
           clockOffset: Date.now() - message.serverNow,
         }))

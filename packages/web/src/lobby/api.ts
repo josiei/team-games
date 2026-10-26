@@ -25,6 +25,44 @@ async function post<T>(url: string, body: unknown): Promise<T> {
   return res.json() as Promise<T>
 }
 
+export type GameTheme = { accent: string; accent2: string; glow: string; danger: string }
+export type Team = { id: string; name: string; color: string }
+
+export type GameCard = {
+  id: string
+  name: string
+  description: string
+  minPlayers: number
+  maxPlayers: number
+  estimatedMinutes: number
+  theme: GameTheme
+  thumbnail: string
+  teams?: Team[]
+}
+
+async function get<T>(url: string): Promise<T> {
+  let res: Response
+  try {
+    res = await fetch(url)
+  } catch {
+    throw new Error(NETWORK_ERROR)
+  }
+  if (!res.ok) {
+    const detail = (await res.json().catch(() => ({}))) as { code?: string }
+    throw new Error(detail.code ?? `HTTP ${res.status}`)
+  }
+  return res.json() as Promise<T>
+}
+
+/** Every game the picker may offer. Hidden modules are filtered server-side. */
+export const listGames = () => get<GameCard[]>('/api/games')
+
+/** Lobby profile. An omitted field is left alone; `team: null` clears it. */
+export const setProfile = (
+  code: string, playerToken: string, patch: { avatar?: string; team?: string | null },
+) =>
+  post<{ ok: true }>(`/api/rooms/${normalizeCode(code)}/me`, { playerToken, ...patch })
+
 export const createRoom = (gameId: string) =>
   post<{ code: string; roomId: string }>('/api/rooms', { gameId })
 
@@ -50,6 +88,10 @@ export function humanize(code: string): string {
     case 'NOT_HOST': return 'Only the host can start the game.'
     case 'NOT_ENOUGH_PLAYERS': return `Need at least ${MIN_PLAYERS} players to start.`
     case 'ALREADY_STARTED': return 'The game has already started.'
+    case 'NOT_A_PLAYER': return "You are not in this room any more. Rejoin with the code."
+    case 'BAD_AVATAR': return 'Pick an avatar from the list.'
+    case 'BAD_TEAM': return 'That team is not part of this game.'
+    case 'TEAMS_INCOMPLETE': return 'Every team needs at least one player.'
     case NETWORK_ERROR: return "Can't reach the server. Check your connection and try again."
     default: return 'Something went wrong. Try again.'
   }

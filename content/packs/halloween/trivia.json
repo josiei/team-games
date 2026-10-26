@@ -1,0 +1,189 @@
+{
+  "_note": "SPOILERS. The twenty text clues for the Halloween pack. Merged into pack.json by scripts/build-halloween-pack.ts. Every clue carries the source that verified it; distractors are same-category and none is arguably correct.",
+  "categories": [
+    {
+      "id": "monster-mash",
+      "name": "Monster Mash",
+      "clues": [
+        {
+          "value": 200,
+          "kind": "text",
+          "prompt": "This Transylvanian count first appeared in Bram Stoker's 1897 novel.",
+          "choices": ["Dracula", "Nosferatu", "Lord Ruthven", "Carmilla"],
+          "source": "https://en.wikipedia.org/wiki/Dracula",
+          "verifiedAt": "2026-10-25"
+        },
+        {
+          "value": 400,
+          "kind": "text",
+          "prompt": "In Mary Shelley's 1818 novel, this is the name of the scientist — not of the creature he makes.",
+          "choices": ["Victor Frankenstein", "Henry Frankenstein", "Victor Moreau", "Adam Walton"],
+          "source": "https://en.wikipedia.org/wiki/Frankenstein",
+          "verifiedAt": "2026-10-25"
+        },
+        {
+          "value": 600,
+          "kind": "text",
+          "prompt": "In Jewish folklore, this figure is shaped from clay and brought to life by an inscription or a word.",
+          "choices": ["Golem", "Dybbuk", "Behemoth", "Leviathan"],
+          "source": "https://en.wikipedia.org/wiki/Golem",
+          "verifiedAt": "2026-10-25"
+        },
+        {
+          "value": 800,
+          "kind": "text",
+          "prompt": "In Algonquian folklore, this creature is associated with winter, famine and insatiable greed.",
+          "choices": ["Wendigo", "Rougarou", "Chupacabra", "Kelpie", "Selkie", "Nisse"],
+          "source": "https://en.wikipedia.org/wiki/Wendigo",
+          "verifiedAt": "2026-10-25"
+        },
+        {
+          "value": 1000,
+          "kind": "text",
+          "prompt": "In Slavic folklore, this witch lives in a hut that stands on chicken legs.",
+          "choices": ["Baba Yaga", "Rusalka", "Koschei", "Domovoi", "Leshy", "Vila"],
+          "source": "https://en.wikipedia.org/wiki/Baba_Yaga",
+          "verifiedAt": "2026-10-25"
+        }
+      ]
+    },
+    {
+      "id": "reel-frights",
+      "name": "Reel Frights",
+      "clues": [
+        {
+          "value": 200,
+          "kind": "text",
+          "prompt": "John Carpenter's 1978 film introduced this masked killer stalking the town of Haddonfield.",
+          "choices": ["Michael Myers", "Jason Voorhees", "Freddy Krueger", "Norman Bates"],
+          "source": "https://en.wikipedia.org/wiki/Halloween_(1978_film)",
+          "verifiedAt": "2026-10-25"
+        },
+        {
+          "value": 400,
+          "kind": "text",
+          "prompt": "Michael Myers' mask in that film was a modified shop-bought mask of this Star Trek character.",
+          "choices": ["Captain Kirk", "Mr Spock", "Doctor McCoy", "Captain Picard"],
+          "source": "https://www.snopes.com/william-shatner-halloween-mask/",
+          "verifiedAt": "2026-10-25"
+        },
+        {
+          "value": 600,
+          "kind": "text",
+          "prompt": "Jason Voorhees did not put on his hockey mask until this entry in the Friday the 13th series.",
+          "choices": ["Part III", "the first film", "Part II", "Jason Lives"],
+          "source": "https://en.wikipedia.org/wiki/Friday_the_13th_Part_III",
+          "verifiedAt": "2026-10-25"
+        },
+        {
+          "value": 800,
+          "kind": "text",
+          "prompt": "Alfred Hitchcock's 1960 film Psycho is set at a roadside motel run by this character.",
+          "choices": ["Norman Bates", "Marion Crane", "Sam Loomis", "Lila Crane", "Milton Arbogast", "Norman Osborn"],
+          "source": "https://en.wikipedia.org/wiki/Psycho_(1960_film)",
+          "verifiedAt": "2026-10-25"
+        },
+        {
+          "value": 1000,
+          "kind": "text",
+          "prompt": "In Stanley Kubrick's film of The Shining, this is the number of the hotel room Danny is told to stay out of.",
+          "choices": ["237", "217", "1408", "101", "113", "666"],
+          "source": "https://en.wikipedia.org/wiki/The_Shining_(film)",
+          "verifiedAt": "2026-10-25"
+        }
+      ]
+    },
+    {
+      "id": "trick-or-treat",
+      "name": "Trick or Treat",
+      "clues": [
+        {
+          "value": 200,
+          "kind": "text",
+          "prompt": "Before pumpkins, jack-o'-lanterns in Ireland and Scotland were carved from this vegetable.",
+          "choices": ["Turnip", "Potato", "Parsnip", "Beetroot"],
+          "source": "https://en.wikipedia.org/wiki/Jack-o%27-lantern",
+          "verifiedAt": "2026-10-25"
+        },
+        {
+          "value": 400,
+          "kind": "text",
+          "prompt": "Halloween's roots are traced to this Gaelic festival marking the end of the harvest season.",
+          "choices": ["Samhain", "Beltane", "Imbolc", "Lughnasadh"],
+          "source": "https://en.wikipedia.org/wiki/Samhain",
+          "verifiedAt": "2026-10-25"
+        },
+        {
+          "value": 600,
+          "kind": "text",
+          "prompt": "Candy corn was originally sold under this decidedly unglamorous name.",
+          "choices": ["Chicken Feed", "Harvest Kernels", "Corn Drops", "Butter Nuggets"],
+          "source": "https://www.mentalfloss.com/article/648356/candy-corn-history",
+          "verifiedAt": "2026-10-25"
+        },
+        {
+          "value": 800,
+          "kind": "text",
+          "prompt": "The word Halloween is a contraction of this older name for the night before All Saints' Day.",
+          "choices": ["All Hallows' Eve", "All Souls' Night", "Hallowmas", "Allantide", "Hallow Tide", "Saints' Vigil"],
+          "source": "https://en.wikipedia.org/wiki/Halloween",
+          "verifiedAt": "2026-10-25"
+        },
+        {
+          "value": 1000,
+          "kind": "text",
+          "prompt": "In this country's Day of the Dead tradition, families build home altars known as ofrendas.",
+          "choices": ["Mexico", "Spain", "Portugal", "Peru", "Guatemala", "The Philippines"],
+          "source": "https://en.wikipedia.org/wiki/Day_of_the_Dead",
+          "verifiedAt": "2026-10-25"
+        }
+      ]
+    },
+    {
+      "id": "things-that-go-bump",
+      "name": "Things That Go Bump",
+      "clues": [
+        {
+          "value": 200,
+          "kind": "text",
+          "prompt": "A group of these nocturnal birds is traditionally called a parliament.",
+          "choices": ["Owls", "Ravens", "Crows", "Bats"],
+          "source": "https://en.wikipedia.org/wiki/List_of_English_terms_of_venery,_by_animal",
+          "verifiedAt": "2026-10-25"
+        },
+        {
+          "value": 400,
+          "kind": "text",
+          "prompt": "All three species of blood-feeding bat live in this part of the world.",
+          "choices": ["Latin America", "Sub-Saharan Africa", "Southeast Asia", "Northern Australia"],
+          "source": "https://en.wikipedia.org/wiki/Vampire_bat",
+          "verifiedAt": "2026-10-25"
+        },
+        {
+          "value": 600,
+          "kind": "text",
+          "prompt": "This California mansion, built by a rifle heiress, is famous for staircases that lead nowhere.",
+          "choices": ["Winchester Mystery House", "Whaley House", "Hearst Castle", "Castello di Amorosa"],
+          "source": "https://en.wikipedia.org/wiki/Winchester_Mystery_House",
+          "verifiedAt": "2026-10-25"
+        },
+        {
+          "value": 800,
+          "kind": "text",
+          "prompt": "In Irish folklore, this spirit's wailing is said to foretell a death in the family.",
+          "choices": ["Banshee", "Dullahan", "Púca", "Changeling", "Selkie", "Leprechaun"],
+          "source": "https://en.wikipedia.org/wiki/Banshee",
+          "verifiedAt": "2026-10-25"
+        },
+        {
+          "value": 1000,
+          "kind": "text",
+          "prompt": "Stephenie Meyer set her 2005 vampire novel in this small, famously rainy Washington town.",
+          "choices": ["Forks", "Port Angeles", "Bellingham", "Sequim", "Astoria", "Coos Bay"],
+          "source": "https://en.wikipedia.org/wiki/Twilight_(Meyer_novel)",
+          "verifiedAt": "2026-10-25"
+        }
+      ]
+    }
+  ]
+}

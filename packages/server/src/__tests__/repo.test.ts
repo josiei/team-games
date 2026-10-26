@@ -3,6 +3,10 @@ import { createDb, type Db } from '../db/client.js'
 import { Repo } from '../db/repo.js'
 import { asRoomCode, newId } from '@tg/shared'
 import { gameResults, players, rooms } from '../db/schema.js'
+import { mkdtempSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import Database from 'better-sqlite3'
 
 let repo: Repo
 let db: Db
@@ -164,5 +168,52 @@ describe('foreign keys', () => {
     expect(() => repo.createRoom({
       workspaceId: 'nope' as never, code: asRoomCode('AAA222'), gameId: 'pumpkin-carve',
     })).toThrow(/FOREIGN KEY/)
+  })
+})
+
+describe('player avatar and team', () => {
+  it('a player is stored with no avatar and no team', () => {
+    const ws = repo.ensureDefaultWorkspace()
+    const room = repo.createRoom({ workspaceId: ws, code: asRoomCode('AB2CD3'), gameId: 'g' })
+    const p = repo.addPlayer({
+      workspaceId: ws, roomId: room.id, displayName: 'A', token: newId(),
+    })
+    const stored = repo.listPlayers(ws, room.id).find(r => r.id === p.id)!
+    expect(stored.avatar).toBe('')
+    expect(stored.team).toBeNull()
+  })
+
+  it('setProfile persists avatar and team', () => {
+    const ws = repo.ensureDefaultWorkspace()
+    const room = repo.createRoom({ workspaceId: ws, code: asRoomCode('AB2CD3'), gameId: 'g' })
+    const p = repo.addPlayer({
+      workspaceId: ws, roomId: room.id, displayName: 'A', token: newId(),
+    })
+    repo.setProfile(ws, p.id, { avatar: 'witch', team: 'red' })
+    const stored = repo.listPlayers(ws, room.id).find(r => r.id === p.id)!
+    expect(stored.avatar).toBe('witch')
+    expect(stored.team).toBe('red')
+  })
+
+  it('a database file created before these columns gains them on open', () => {
+    // The room_snapshot columns are already migrated this way; the player
+    // table now needs the same, or an existing data/ file breaks on boot.
+    const dir = mkdtempSync(join(tmpdir(), 'tg-migrate-'))
+    const file = join(dir, 'old.sqlite')
+    const legacy = new Database(file)
+    legacy.exec(`CREATE TABLE player (
+      id TEXT PRIMARY KEY, room_id TEXT NOT NULL, workspace_id TEXT NOT NULL,
+      display_name TEXT NOT NULL, user_id TEXT, token TEXT NOT NULL,
+      connected INTEGER NOT NULL DEFAULT 1, joined_at INTEGER NOT NULL)`)
+    legacy.close()
+
+    createDb(file)
+    const reopened = new Database(file)
+    const cols = (reopened.pragma('table_info(player)') as { name: string }[])
+      .map(c => c.name)
+    reopened.close()
+    rmSync(dir, { recursive: true, force: true })
+    expect(cols).toContain('avatar')
+    expect(cols).toContain('team')
   })
 })

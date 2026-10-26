@@ -5,7 +5,7 @@ import type { Stroke } from '../carve.js'
 import { collapseThresholdFor } from '../carve.js'
 
 const player = (id: string, joinedAt: number) =>
-  ({ id: asPlayerId(id), displayName: id, connected: true, joinedAt })
+  ({ id: asPlayerId(id), displayName: id, connected: true, joinedAt, avatar: '', team: null })
 
 const three = [player('a', 1), player('b', 2), player('c', 3)]
 const base = () => setPhase(createState(three, 42), 'carving')
@@ -118,7 +118,7 @@ describe('determinism golden vectors', () => {
 
   it('createState slot order matches the pinned gallery order', () => {
     const ps = ['p1', 'p2', 'p3', 'p4', 'p5'].map((id, i) =>
-      ({ id: asPlayerId(id), displayName: id, connected: true, joinedAt: i }))
+      ({ id: asPlayerId(id), displayName: id, connected: true, joinedAt: i , avatar: '', team: null}))
     expect(createState(ps, 1234).slots).toEqual(['p5', 'p2', 'p4', 'p3', 'p1'])
     expect(createState(ps, 1235).slots).toEqual(['p2', 'p4', 'p1', 'p5', 'p3'])
   })

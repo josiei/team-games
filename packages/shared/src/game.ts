@@ -6,7 +6,17 @@ export type Player = {
   displayName: string
   connected: boolean
   joinedAt: number
+  /** An id from AVATARS, or '' before the player has chosen one. */
+  avatar: string
+  /**
+   * The lobby group this player joined, or null for no team and for games
+   * that declare none. Generic on purpose: the team is picked in the lobby,
+   * before game state exists, so it cannot live in a game's own state.
+   */
+  team: string | null
 }
+
+export type Team = { id: string; name: string; color: string }
 
 export type GameTheme = {
   accent: string
@@ -52,6 +62,56 @@ export interface GameModule<State, Action, View> {
    * leaves this out and every phase runs its full duration.
    */
   phaseComplete?(state: State, phase: string, players: Player[]): boolean
+
+  /**
+   * The phase to enter when `current` ends, or null to stop there. Omit it and
+   * the runtime walks `phases` in order, which is what every linear game wants.
+   *
+   * Implement it when the order is decided at runtime rather than written down:
+   * a board game returns to its board as many times as there are tiles, in
+   * whatever order the players pick, and an index walk cannot express that.
+   *
+   * The returned name MUST be one of `phases`; anything else is treated as a
+   * module bug and ends the room visibly rather than stalling it. Because this
+   * can return to a phase already visited, the runtime caps how many
+   * transitions one room may make — see MAX_PHASE_HOPS.
+   */
+  nextPhase?(state: State, current: string): string | null
+
+  /**
+   * Action types only the room's current host may dispatch. Everything else is
+   * open to any player in the room, as before.
+   *
+   * The check lives in the runtime rather than in `reduce` because `reduce` is
+   * pure and is handed only `by` — it has no way to know who the host is, and
+   * `hostId` moves when a host disconnects, so a copy taken at createState
+   * would be wrong by the time it mattered.
+   */
+  readonly hostActions?: readonly string[]
+
+  /**
+   * Lobby teams this game splits players into, or absent for a game played by
+   * individuals. The lobby renders team columns only when a game declares
+   * them, so adding this changes nothing for pumpkin-carve.
+   *
+   * A game that declares none rejects every team id, rather than silently
+   * accepting one it will never use.
+   */
+  readonly teams?: readonly Team[]
+
+  /**
+   * Path to the card art the game picker shows, under the web client's static
+   * assets. Required: a picker with a blank card reads as broken, so a game
+   * without art ships a placeholder rather than nothing.
+   */
+  readonly thumbnail: string
+
+  /**
+   * Keep this game out of the picker. Used for a module that exists only for
+   * tests — a dev-content twin of a real game — which must be reachable by id
+   * but must never be offered to players.
+   */
+  readonly hidden?: boolean
 }
 
 /**

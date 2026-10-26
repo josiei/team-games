@@ -1,0 +1,549 @@
+/* Fright Night: the set, the board, and the clue stage.
+ *
+ * Layer one (shell tokens) comes from tokens.css. The values here are the
+ * game's own palette, declared once so the art pass can swap the backdrop
+ * without touching any component.
+ */
+
+.fright-set {
+  --fright-accent: #7c3aed;
+  --fright-accent2: #ff7518;
+  --fright-glow: #c4b5fd;
+  --fright-danger: #ef4444;
+
+  position: relative;
+  min-height: 100vh;
+  padding: 16px;
+  display: grid;
+  grid-template-rows: 1fr auto auto;
+  gap: 12px;
+  overflow: hidden;
+  /* The painted set, with the gradient behind it as the fallback the layout
+     was built against — if the image is missing the room still reads. */
+  background:
+    linear-gradient(rgba(11, 7, 18, 0.55), rgba(11, 7, 18, 0.75)),
+    url('/games/fright-night/set.png') center / cover no-repeat,
+    radial-gradient(ellipse at 50% 0%, #2a1a3e 0%, #150d22 55%, #0b0712 100%);
+  image-rendering: pixelated;
+  color: var(--shell-text, #f4f2f8);
+  font-family: Inter, system-ui, sans-serif;
+}
+
+/* ---- Backdrop ---------------------------------------------------------- */
+
+/* The painted set supplies the sky and pillars, so the CSS ones only show
+   when the image has not loaded. */
+.set-sky { position: absolute; inset: 0 0 auto; height: 40%; pointer-events: none; opacity: 0.4; }
+
+.set-star {
+  position: absolute;
+  width: 2px;
+  height: 2px;
+  border-radius: 50%;
+  background: #fff;
+  opacity: 0.55;
+}
+
+.set-pillar {
+  position: absolute;
+  top: 6%;
+  width: 34px;
+  height: 72%;
+  pointer-events: none;
+  border-radius: 4px;
+  background: linear-gradient(90deg, #2b2440 0%, #6a5f8d 35%, #cfc6e8 50%, #6a5f8d 65%, #2b2440 100%);
+  box-shadow: 0 0 40px rgba(196, 181, 253, 0.25);
+  opacity: 0.35;
+}
+
+.set-pillar.is-left { left: 10px; }
+.set-pillar.is-right { right: 10px; }
+
+/* ---- Proscenium -------------------------------------------------------- */
+
+.set-proscenium {
+  position: relative;
+  display: grid;
+  place-items: stretch;
+  margin: 0 56px;
+  padding: 10px;
+  border-radius: 10px;
+  border: 3px solid #5b4f80;
+  background: rgba(10, 7, 18, 0.92);
+  box-shadow: 0 0 60px rgba(124, 58, 237, 0.3), inset 0 0 40px rgba(0, 0, 0, 0.8);
+}
+
+.set-panel { display: grid; align-content: start; min-height: 0; }
+
+.set-banner {
+  margin: 0;
+  text-align: center;
+  font-size: 0.8rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--shell-muted, #9a95ad);
+}
+
+/* ---- Score rails ------------------------------------------------------- */
+
+.set-rails {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  padding: 0 56px 8px;
+}
+
+.score-rail {
+  display: grid;
+  grid-template-columns: auto 1fr auto auto;
+  align-items: center;
+  gap: 10px;
+  padding-bottom: 6px;
+  position: relative;
+}
+
+.rail-avatars { display: flex; gap: 2px; font-size: 1.1rem; line-height: 1; }
+
+.rail-name {
+  font-family: Archivo, system-ui, sans-serif;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--team, #fff);
+}
+
+.rail-score {
+  font-family: Archivo, system-ui, sans-serif;
+  font-weight: 900;
+  font-size: 1.6rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.rail-lifelines { display: flex; gap: 4px; }
+
+.rail-pip {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  border: 1px solid var(--shell-muted, #9a95ad);
+}
+
+/* Spent pips go dark; lit ones glow. Shape plus brightness, not hue alone. */
+.rail-pip.is-lit { background: #ffc24d; border-color: #ffc24d; box-shadow: 0 0 8px #ffc24d; }
+
+.rail-underline {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--team, #666);
+  box-shadow: 0 0 14px var(--team, #666);
+}
+
+/* ---- Board ------------------------------------------------------------- */
+
+.board { display: grid; gap: 6px; align-content: start; }
+
+.board-row {
+  display: grid;
+  grid-template-columns: repeat(var(--cols, 6), 1fr);
+  gap: 6px;
+}
+
+.board-head {
+  display: grid;
+  place-items: center;
+  min-height: 56px;
+  padding: 6px 4px;
+  text-align: center;
+  font-family: Archivo, system-ui, sans-serif;
+  font-weight: 900;
+  font-size: 0.72rem;
+  line-height: 1.15;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  border-radius: 4px;
+  background: #15102a;
+  border: 1px solid #3a2f5c;
+}
+
+.board-tile {
+  display: grid;
+  place-items: center;
+  min-height: 54px;
+  font-family: Archivo, system-ui, sans-serif;
+  font-weight: 900;
+  font-size: 1.5rem;
+  font-variant-numeric: tabular-nums;
+  color: #ffc24d;
+  border-radius: 4px;
+  border: 1px solid #3a2f5c;
+  background: #1b1338;
+  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.6);
+  cursor: pointer;
+  transition: background 100ms ease, transform 100ms ease;
+}
+
+.board-tile:hover:not(:disabled),
+.board-tile:focus-visible:not(:disabled) {
+  background: #2a1c57;
+  transform: scale(1.03);
+  outline: 2px solid var(--fright-glow, #c4b5fd);
+}
+
+.board-tile:disabled { cursor: default; opacity: 0.55; }
+
+/* A played tile is an empty hole in the board, exactly as on the show. */
+.board-tile.is-spent {
+  background: #0b0818;
+  border-color: #241d3d;
+  box-shadow: inset 0 0 18px rgba(0, 0, 0, 0.9);
+  cursor: default;
+}
+
+.board-turn {
+  margin: 6px 0 0;
+  text-align: center;
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--shell-muted, #9a95ad);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .board-tile { transition: none; }
+  .board-tile:hover:not(:disabled) { transform: none; }
+}
+
+/* ---- Clue stage -------------------------------------------------------- */
+
+.stage { display: grid; gap: 12px; align-content: start; padding: 4px; }
+
+.stage-head {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  margin: 0;
+  font-family: Archivo, system-ui, sans-serif;
+  font-weight: 800;
+  font-size: 0.8rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--fright-glow, #c4b5fd);
+}
+
+.stage-value { color: #ffc24d; }
+
+.stage-clue { display: grid; gap: 10px; justify-items: center; }
+
+.stage-prompt {
+  margin: 0;
+  max-width: 44ch;
+  text-align: center;
+  font-size: 1.15rem;
+  line-height: 1.4;
+  font-weight: 600;
+}
+
+.pixel-image { position: relative; width: min(280px, 50vw); aspect-ratio: 3 / 4; }
+
+/* Hard blocks, not a blur: the canvas is tiny and scaled up by the browser. */
+.pixel-canvas {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  image-rendering: pixelated;
+  border-radius: 6px;
+  box-shadow: 0 0 0 2px rgba(255, 117, 24, 0.5), 0 10px 30px rgba(0, 0, 0, 0.6);
+}
+
+.pixel-placeholder {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 6px;
+  background: repeating-linear-gradient(
+    45deg, #1b1338 0 10px, #241a46 10px 20px);
+  box-shadow: 0 0 0 2px rgba(255, 117, 24, 0.5);
+  color: var(--shell-muted, #9a95ad);
+  font-size: 0.8rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.pixel-reveal {
+  image-rendering: auto;   /* the un-pixelated photograph */
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 6px;
+  animation: pixel-resolve 500ms ease forwards;
+}
+
+@keyframes pixel-resolve { from { opacity: 0 } to { opacity: 1 } }
+
+/* ---- Choices ----------------------------------------------------------- */
+
+.choice-grid {
+  display: grid;
+  grid-template-columns: repeat(var(--cols, 2), 1fr);
+  gap: 8px;
+}
+
+.choice {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 10px;
+  align-items: center;
+  padding: 12px 14px;
+  text-align: left;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--shell-text, #f4f2f8);
+  background: #1b1338;
+  border: 2px solid #3a2f5c;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: border-color 100ms ease, background 100ms ease;
+}
+
+.choice:not(:disabled):hover,
+.choice:not(:disabled):focus-visible {
+  border-color: var(--fright-glow, #c4b5fd);
+  background: #261a4d;
+}
+
+.choice:disabled { cursor: default; }
+
+.choice-number {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  border-radius: 50%;
+  background: #0d0920;
+  border: 1px solid #4a3d75;
+}
+
+/* Wrong: struck through AND dimmed, so it never relies on colour alone. */
+.choice.is-wrong { opacity: 0.4; border-color: var(--fright-danger, #ef4444); }
+.choice.is-wrong .choice-text { text-decoration: line-through; }
+
+/* Cut by a flashlight: dimmed further, and only this viewer's team sees it. */
+.choice.is-cut { opacity: 0.22; border-style: dashed; }
+
+.flashlight {
+  justify-self: center;
+  padding: 9px 16px;
+  font-weight: 800;
+  font-size: 0.8rem;
+  letter-spacing: 0.04em;
+  color: #140a02;
+  background: #ffc24d;
+  border: none;
+  border-radius: 999px;
+  cursor: pointer;
+  box-shadow: 0 0 18px rgba(255, 194, 77, 0.55);
+}
+
+/* ---- Buzzer ------------------------------------------------------------ */
+
+.buzzer {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  padding: 16px 16px 16px 72px;   /* room for the pill, label stays centred */
+  font-family: Archivo, system-ui, sans-serif;
+  font-weight: 900;
+  font-size: 1.1rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  border-radius: 999px;
+  cursor: pointer;
+  /* Dead: grey, flat, not obviously a button. */
+  color: var(--shell-muted, #9a95ad);
+  background: #15102a;
+  border: 2px dashed #3a2f5c;
+  transition: background 140ms ease, color 140ms ease, box-shadow 140ms ease;
+}
+
+/* The single most important transition in the game. */
+.buzzer.is-armed {
+  color: #140a02;
+  background: var(--fright-accent2, #ff7518);
+  border: 2px solid var(--fright-accent2, #ff7518);
+  box-shadow: 0 0 28px rgba(255, 117, 24, 0.75);
+  animation: buzzer-arm 320ms ease;
+}
+
+@keyframes buzzer-arm {
+  from { transform: scale(0.97); box-shadow: 0 0 0 rgba(255, 117, 24, 0) }
+  60% { transform: scale(1.03) }
+  to { transform: scale(1) }
+}
+
+.buzzer:disabled { cursor: default; }
+.buzzer.is-armed:disabled { opacity: 0.45; }
+
+/* An instrument, not the next word in the sentence: own shape, own edge. */
+.buzzer-clock {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: grid;
+  place-items: center;
+  min-width: 3ch;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.42);
+  font-variant-numeric: tabular-nums;
+  font-size: 1.25rem;
+  line-height: 1.2;
+}
+
+.answer-banner {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin: 0;
+  padding: 16px 16px 16px 72px;
+  border-radius: 999px;
+  background: rgba(124, 58, 237, 0.14);
+  border: 2px solid var(--fright-accent, #7c3aed);
+  font-size: 0.95rem;
+}
+
+.answer-banner .buzzer-clock {
+  color: var(--fright-accent2, #ff7518);
+  font-weight: 900;
+  background: rgba(0, 0, 0, 0.35);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .buzzer, .buzzer.is-armed, .pixel-reveal { animation: none; transition: none; }
+}
+
+/* ---- Reveal and results ------------------------------------------------ */
+
+.choice.is-correct {
+  border-color: #84cc16;
+  background: rgba(132, 204, 22, 0.16);
+  box-shadow: 0 0 20px rgba(132, 204, 22, 0.4);
+}
+
+/* A tick as well as the colour: nothing is encoded in hue alone. */
+.choice.is-correct .choice-number::after { content: '\2713'; }
+
+.reveal-outcome {
+  margin: 4px 0 0;
+  text-align: center;
+  font-family: Archivo, system-ui, sans-serif;
+  font-weight: 900;
+  font-size: 1.1rem;
+  letter-spacing: 0.04em;
+  color: #ffc24d;
+}
+
+.results { display: grid; gap: 16px; justify-items: center; padding: 8px; }
+
+.results-title {
+  margin: 0;
+  font-family: Archivo, system-ui, sans-serif;
+  font-weight: 900;
+  font-size: 2rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.results-subtitle {
+  margin: 8px 0 0;
+  font-size: 0.8rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--shell-muted, #9a95ad);
+}
+
+.results-scores { display: flex; gap: 32px; }
+
+.results-score {
+  display: grid;
+  justify-items: center;
+  padding: 10px 20px;
+  border-radius: 10px;
+  border: 2px solid var(--team, #666);
+}
+
+.results-score.is-winner { box-shadow: 0 0 24px var(--team, #666); }
+
+.results-team {
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--team, #fff);
+}
+
+.results-number {
+  font-family: Archivo, system-ui, sans-serif;
+  font-weight: 900;
+  font-size: 2.2rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.results-callouts { display: grid; gap: 2px; text-align: center; color: var(--shell-muted, #9a95ad); }
+.results-callouts p { margin: 0; }
+.results-callouts strong { color: var(--shell-text, #f4f2f8); }
+
+.gallery {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  width: 100%;
+}
+
+.gallery-card {
+  display: grid;
+  gap: 2px;
+  padding-bottom: 8px;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #15102a;
+  border: 1px solid #3a2f5c;
+}
+
+.gallery-card img {
+  width: 100%;
+  aspect-ratio: 3 / 4;
+  object-fit: cover;
+  image-rendering: auto;   /* a photograph, not pixel art */
+}
+.gallery-answer { padding: 0 8px; font-weight: 700; font-size: 0.85rem; }
+.gallery-meta { padding: 0 8px; font-size: 0.7rem; color: var(--shell-muted, #9a95ad); }
+
+.host-bar {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  align-items: center;
+}
+
+.host-tag {
+  font-size: 0.65rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--shell-muted, #9a95ad);
+}

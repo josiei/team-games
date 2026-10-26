@@ -184,7 +184,9 @@ describe('joinedAt ordering key', () => {
 describe('roomConfigFromEnv', () => {
   it('defaults to 180s carving and 15s votes', () => {
     const c = roomConfigFromEnv({})
-    expect(c.phaseMs).toEqual({
+    // Narrowed from toEqual: phaseMs is shared by every registered game, so
+    // asserting the whole object made a second game look like a regression.
+    expect(c.phaseMs).toMatchObject({
       carving: 180_000, 'vote-scariest': 15_000, 'vote-funniest': 15_000,
       'vote-craft': 15_000, 'vote-cursed': 15_000,
     })
@@ -203,6 +205,71 @@ describe('roomConfigFromEnv', () => {
       const c = roomConfigFromEnv({ CARVE_MS: bad, VOTE_MS: bad })
       expect(c.phaseMs.carving).toBe(180_000)
       expect(c.phaseMs['vote-craft']).toBe(15_000)
+    }
+  })
+})
+
+describe('avatar and team', () => {
+  it('a new player starts with no avatar and no team', () => {
+    const room = make()
+    const p = store.addPlayer(room, { displayName: 'A', token: newId() })
+    expect(p.avatar).toBe('')
+    expect(p.team).toBeNull()
+  })
+
+  it('setProfile updates avatar and team on the live player', () => {
+    const room = make()
+    const p = store.addPlayer(room, { displayName: 'A', token: newId() })
+    store.setProfile(room, p.id, { avatar: 'vampire', team: 'blue' })
+    expect(room.players.get(p.id)!.avatar).toBe('vampire')
+    expect(room.players.get(p.id)!.team).toBe('blue')
+  })
+
+  it('setProfile leaves a field alone when the patch omits it', () => {
+    const room = make()
+    const p = store.addPlayer(room, { displayName: 'A', token: newId() })
+    store.setProfile(room, p.id, { avatar: 'ghost', team: 'red' })
+    store.setProfile(room, p.id, { avatar: 'bat' })
+    expect(room.players.get(p.id)!.team).toBe('red')
+  })
+
+  it('setProfile can clear a team with null', () => {
+    const room = make()
+    const p = store.addPlayer(room, { displayName: 'A', token: newId() })
+    store.setProfile(room, p.id, { team: 'blue' })
+    store.setProfile(room, p.id, { team: null })
+    expect(room.players.get(p.id)!.team).toBeNull()
+  })
+
+  it('setProfile on an unknown player changes nothing', () => {
+    const room = make()
+    expect(() => store.setProfile(room, newId() as never, { avatar: 'owl' })).not.toThrow()
+  })
+})
+
+describe('fright night phase durations', () => {
+  it('gives every fright phase a duration', () => {
+    const config = roomConfigFromEnv({})
+    for (const phase of ['board', 'reading', 'clue', 'steal', 'answer', 'reveal']) {
+      expect(config.phaseMs[phase]).toBeGreaterThan(0)
+    }
+  })
+
+  it('a steal is shorter than a first look, because that team has already read it', () => {
+    const config = roomConfigFromEnv({})
+    expect(config.phaseMs.steal!).toBeLessThan(config.phaseMs.clue!)
+  })
+
+  it('env vars override each one', () => {
+    const config = roomConfigFromEnv({ BOARD_MS: '1234', READ_MS: '77' })
+    expect(config.phaseMs.board).toBe(1234)
+    expect(config.phaseMs.reading).toBe(77)
+  })
+
+  it('an invalid value falls back to the default', () => {
+    const fallback = roomConfigFromEnv({}).phaseMs.board
+    for (const bad of ['0', '-5', 'soon', '']) {
+      expect(roomConfigFromEnv({ BOARD_MS: bad }).phaseMs.board).toBe(fallback)
     }
   })
 })

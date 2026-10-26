@@ -3,8 +3,8 @@ import { createState, setPhase, viewFor } from '../pumpkin.js'
 import { asPlayerId } from '../ids.js'
 
 const players = [
-  { id: asPlayerId('a'), displayName: 'A', connected: true, joinedAt: 1 },
-  { id: asPlayerId('b'), displayName: 'B', connected: true, joinedAt: 2 },
+  { id: asPlayerId('a'), displayName: 'A', connected: true, joinedAt: 1 , avatar: '', team: null},
+  { id: asPlayerId('b'), displayName: 'B', connected: true, joinedAt: 2 , avatar: '', team: null},
 ]
 const LATE = asPlayerId('late')
 

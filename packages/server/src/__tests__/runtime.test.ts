@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { InMemoryRoomStore } from '../rooms/store.js'
-import { EARLY_ADVANCE_MS, RoomRuntime } from '../rooms/runtime.js'
+import { EARLY_ADVANCE_MS, MAX_PHASE_HOPS, RoomRuntime } from '../rooms/runtime.js'
 import { pumpkinModule } from '../games/pumpkin/index.js'
 import { createDb } from '../db/client.js'
 import { Repo } from '../db/repo.js'
@@ -624,5 +624,229 @@ describe('disposed and logging hygiene', () => {
     expect(line).not.toContain('y'.repeat(20))
     r.dispose()
     err.mockRestore()
+  })
+})
+
+describe('nextPhase', () => {
+  type StubState = { phase: string }
+
+  /**
+   * A module with its own tiny phase list. `phaseMs` has no entry for these
+   * names, so no phase clock arms and every transition here is driven by an
+   * explicit advancePhase() — which is what makes the hop-budget test fast.
+   */
+  function stub(overrides: Partial<GameModule<StubState, unknown, unknown>> = {}) {
+    return {
+      ...pumpkinModule,
+      phases: ['lobby', 'a', 'b', 'c'],
+      createState: () => ({ phase: 'lobby' }),
+      setPhase: (state: StubState, phase: string) => ({ ...state, phase }),
+      viewFor: (state: StubState) => ({ kind: 'stub', phase: state.phase }),
+      onPhaseEnter: () => {},
+      ...overrides,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as unknown as GameModule<any, any, any>
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  function runWith(module: GameModule<any, any, any>) {
+    const room = store.all()[0]!
+    const r = new RoomRuntime({
+      room, store, repo, module,
+      send: (to, message) => sent.push({ to, message }),
+    })
+    return r
+  }
+
+  it('a module without nextPhase advances by index', () => {
+    const r = runWith(stub())
+    r.start()
+    expect(r.phase).toBe('a')
+    r.advancePhase()
+    expect(r.phase).toBe('b')
+    r.dispose()
+  })
+
+  it('nextPhase can return an earlier phase, so a loop is possible', () => {
+    const r = runWith(stub({
+      nextPhase: (_state, current) => (current === 'b' ? 'a' : 'b'),
+    }))
+    r.start()
+    expect(r.phase).toBe('a')
+    r.advancePhase()
+    expect(r.phase).toBe('b')
+    r.advancePhase()
+    expect(r.phase).toBe('a')      // an index walk could never get back here
+    r.dispose()
+  })
+
+  it('nextPhase returning null leaves the room in its current phase', () => {
+    const r = runWith(stub({ nextPhase: () => null }))
+    r.start()
+    expect(r.phase).toBe('a')
+    r.advancePhase()
+    expect(r.phase).toBe('a')
+    r.dispose()
+  })
+
+  it('nextPhase returning an unknown phase fails the room with PHASE_FAILED', () => {
+    const err = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const r = runWith(stub({ nextPhase: () => 'not-a-phase' }))
+    r.start()
+    sent.length = 0
+    r.advancePhase()
+    const codes = sent
+      .filter(s => s.message.type === 'error')
+      .map(s => (s.message as { code: string }).code)
+    expect(codes).toContain('PHASE_FAILED')
+    expect(r.phase).toBe('c')      // the terminal phase, not the bad name
+    r.dispose()
+    err.mockRestore()
+  })
+
+  it('a nextPhase that returns its own phase stops at MAX_PHASE_HOPS and fails the room', () => {
+    const err = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const r = runWith(stub({ nextPhase: (_state, current) => current }))
+    r.start()
+    for (let i = 0; i < MAX_PHASE_HOPS + 5; i++) r.advancePhase()
+    const codes = sent
+      .filter(s => s.message.type === 'error')
+      .map(s => (s.message as { code: string }).code)
+    expect(codes).toContain('PHASE_FAILED')
+    expect(r.phase).toBe('c')
+    r.dispose()
+    err.mockRestore()
+  })
+})
+
+describe('hostActions', () => {
+  /** Records every (by, action.type) pair the reducer actually sees. */
+  function spying(hostActions?: readonly string[]) {
+    const seen: { by: PlayerId; type: string }[] = []
+    const module = {
+      ...pumpkinModule,
+      ...(hostActions ? { hostActions } : {}),
+      reduce: (state: unknown, action: { type: string }, by: PlayerId) => {
+        seen.push({ by, type: action.type })
+        return state
+      },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as unknown as GameModule<any, any, any>
+    return { seen, module }
+  }
+
+  it('an action in hostActions from a non-host never reaches reduce', () => {
+    const { seen, module } = spying(['SKIP'])
+    const room = store.all()[0]!
+    const r = new RoomRuntime({ room, store, repo, module, send: () => {} })
+    r.start()
+    const notHost = ids.find(id => id !== room.hostId)!
+    r.dispatch(notHost, { type: 'SKIP' })
+    expect(seen).toEqual([])
+    r.dispose()
+  })
+
+  it('an action in hostActions from the host reaches reduce', () => {
+    const { seen, module } = spying(['SKIP'])
+    const room = store.all()[0]!
+    const r = new RoomRuntime({ room, store, repo, module, send: () => {} })
+    r.start()
+    r.dispatch(room.hostId!, { type: 'SKIP' })
+    expect(seen.map(s => s.type)).toEqual(['SKIP'])
+    r.dispose()
+  })
+
+  it('an action not in hostActions is ungated', () => {
+    const { seen, module } = spying(['SKIP'])
+    const room = store.all()[0]!
+    const r = new RoomRuntime({ room, store, repo, module, send: () => {} })
+    r.start()
+    const notHost = ids.find(id => id !== room.hostId)!
+    r.dispatch(notHost, { type: 'BUZZ' })
+    expect(seen.map(s => s.type)).toEqual(['BUZZ'])
+    r.dispose()
+  })
+
+  it('after host reassignment the new host can dispatch a host action', () => {
+    const { seen, module } = spying(['SKIP'])
+    const room = store.all()[0]!
+    const r = new RoomRuntime({ room, store, repo, module, send: () => {} })
+    r.start()
+    const firstHost = room.hostId!
+    r.onDisconnect(firstHost)                 // host moves to the next connected player
+    const newHost = room.hostId!
+    expect(newHost).not.toBe(firstHost)
+    r.dispatch(newHost, { type: 'SKIP' })
+    expect(seen.map(s => s.type)).toEqual(['SKIP'])
+    r.dispose()
+  })
+
+  it('the former host loses the privilege when the host moves', () => {
+    const { seen, module } = spying(['SKIP'])
+    const room = store.all()[0]!
+    const r = new RoomRuntime({ room, store, repo, module, send: () => {} })
+    r.start()
+    const firstHost = room.hostId!
+    r.onDisconnect(firstHost)
+    r.onConnect(firstHost)                    // back, but no longer host
+    expect(room.hostId).not.toBe(firstHost)
+    r.dispatch(firstHost, { type: 'SKIP' })
+    expect(seen).toEqual([])
+    r.dispose()
+  })
+
+  it('a module with no hostActions gates nothing', () => {
+    const { seen, module } = spying()
+    const room = store.all()[0]!
+    const r = new RoomRuntime({ room, store, repo, module, send: () => {} })
+    r.start()
+    const notHost = ids.find(id => id !== room.hostId)!
+    r.dispatch(notHost, { type: 'SKIP' })
+    expect(seen.map(s => s.type)).toEqual(['SKIP'])
+    r.dispose()
+  })
+})
+
+describe('a rejected action costs nothing', () => {
+  /**
+   * Every fright guard rejects by returning the state unchanged, and losing a
+   * buzzer race is the commonest path through this code. Persisting and
+   * re-broadcasting a 30-clue state for each losing press would load the
+   * event loop with exactly the traffic that decides who was first.
+   */
+  it('does not broadcast when the reducer changes nothing', () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const mod: GameModule<any, any, any> = {
+      ...pumpkinModule,
+      reduce: (state: unknown) => state,          // every action is a no-op
+    }
+    const room = store.all()[0]!
+    const r = new RoomRuntime({
+      room, store, repo, module: mod,
+      send: (to, message) => sent.push({ to, message }),
+    })
+    r.start()
+    sent.length = 0
+    r.dispatch(ids[0]!, { type: 'ANYTHING' })
+    expect(sent).toEqual([])
+    r.dispose()
+  })
+
+  it('still broadcasts when the reducer does change something', () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const mod: GameModule<any, any, any> = {
+      ...pumpkinModule,
+      reduce: (state: object) => ({ ...state }),
+    }
+    const room = store.all()[0]!
+    const r = new RoomRuntime({
+      room, store, repo, module: mod,
+      send: (to, message) => sent.push({ to, message }),
+    })
+    r.start()
+    sent.length = 0
+    r.dispatch(ids[0]!, { type: 'ANYTHING' })
+    expect(sent.filter(s => s.message.type === 'snapshot').length).toBeGreaterThan(0)
+    r.dispose()
   })
 })

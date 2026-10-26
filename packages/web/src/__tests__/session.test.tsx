@@ -157,7 +157,10 @@ describe('session persistence', () => {
     await waitFor(() => expect(connect).toHaveBeenCalled())
     act(() => useConnection.setState({
       status: 'open', view: { kind: 'lobby', playerCount: 1 }, me: asPlayerId('me'),
-      players: [{ id: asPlayerId('me'), displayName: 'Jocelyn', connected: true, joinedAt: 1 }],
+      players: [{
+        id: asPlayerId('me'), displayName: 'Jocelyn', connected: true, joinedAt: 1,
+        avatar: '', team: null,
+      }],
       labels: { me: 'Jocelyn' }, hostId: asPlayerId('me'), disconnect,
     }))
     fireEvent.click(screen.getByRole('button', { name: /leave/i }))
