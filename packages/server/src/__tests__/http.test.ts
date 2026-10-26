@@ -292,3 +292,75 @@ describe('robustness', () => {
     expect(res.statusCode).toBe(400)
   })
 })
+
+describe('POST /api/rooms/:code/me', () => {
+  const setProfile = async (code: string, payload: Record<string, unknown>) =>
+    await app.inject({ method: 'POST', url: `/api/rooms/${code}/me`, payload })
+
+  it('stores a chosen avatar on the live player and in the database', async () => {
+    const room = await createRoom()
+    const { playerId, playerToken } = (await join(room.code, 'Jocelyn')).json()
+    const res = await setProfile(room.code, { playerToken, avatar: 'vampire' })
+    expect(res.statusCode).toBe(200)
+
+    const live = store.byCode(asRoomCode(room.code))!
+    expect(live.players.get(playerId)!.avatar).toBe('vampire')
+    const stored = repo.listPlayers(live.workspaceId, live.id).find(p => p.id === playerId)!
+    expect(stored.avatar).toBe('vampire')
+  })
+
+  it('rejects an unknown room code with ROOM_NOT_FOUND', async () => {
+    const res = await setProfile('ZZ9ZZ9', { playerToken: 'nope', avatar: 'ghost' })
+    expect(res.statusCode).toBe(404)
+    expect(res.json().code).toBe('ROOM_NOT_FOUND')
+  })
+
+  it('rejects an unknown playerToken with NOT_A_PLAYER', async () => {
+    const room = await createRoom()
+    await join(room.code, 'Jocelyn')
+    const res = await setProfile(room.code, { playerToken: 'not-a-token', avatar: 'ghost' })
+    expect(res.statusCode).toBe(403)
+    expect(res.json().code).toBe('NOT_A_PLAYER')
+  })
+
+  it('rejects a profile change after the game has started with ALREADY_STARTED', async () => {
+    const room = await createRoom()
+    const host = (await join(room.code, 'Jocelyn')).json()
+    await join(room.code, 'Sam')
+    await app.inject({
+      method: 'POST', url: `/api/rooms/${room.code}/start`,
+      payload: { playerToken: host.playerToken },
+    })
+    const res = await setProfile(room.code, { playerToken: host.playerToken, avatar: 'bat' })
+    expect(res.statusCode).toBe(409)
+    expect(res.json().code).toBe('ALREADY_STARTED')
+  })
+
+  // An unchecked string here renders in every other player's lobby.
+  it('rejects an avatar id that is not in AVATARS with BAD_AVATAR', async () => {
+    const room = await createRoom()
+    const { playerId, playerToken } = (await join(room.code, 'Jocelyn')).json()
+    const res = await setProfile(room.code, { playerToken, avatar: '<img src=x>' })
+    expect(res.statusCode).toBe(400)
+    expect(res.json().code).toBe('BAD_AVATAR')
+    expect(store.byCode(asRoomCode(room.code))!.players.get(playerId)!.avatar).toBe('')
+  })
+
+  it('rejects a team the selected game does not declare with BAD_TEAM', async () => {
+    // pumpkin-carve declares no teams at all, so every team id is wrong for it.
+    const room = await createRoom()
+    const { playerId, playerToken } = (await join(room.code, 'Jocelyn')).json()
+    const res = await setProfile(room.code, { playerToken, team: 'blue' })
+    expect(res.statusCode).toBe(400)
+    expect(res.json().code).toBe('BAD_TEAM')
+    expect(store.byCode(asRoomCode(room.code))!.players.get(playerId)!.team).toBeNull()
+  })
+
+  it('allows team: null, which clears the team', async () => {
+    const room = await createRoom()
+    const { playerId, playerToken } = (await join(room.code, 'Jocelyn')).json()
+    const res = await setProfile(room.code, { playerToken, team: null })
+    expect(res.statusCode).toBe(200)
+    expect(store.byCode(asRoomCode(room.code))!.players.get(playerId)!.team).toBeNull()
+  })
+})

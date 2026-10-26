@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify'
-import { generateCode, newId, normalizeCode, type RoomId } from '@tg/shared'
+import { generateCode, isAvatarId, newId, normalizeCode, type RoomId } from '@tg/shared'
 import { GAMES, getGame } from '../games/registry.js'
 import { RoomRuntime } from '../rooms/runtime.js'
 import type { InMemoryRoomStore } from '../rooms/store.js'
@@ -82,6 +82,55 @@ export function registerRoomRoutes(app: FastifyInstance, deps: AppDeps): void {
     runtimes.get(live.id)?.onConnect(player.id)
 
     return { roomId: live.id, playerId: player.id, playerToken: token }
+  })
+
+  /**
+   * The lobby profile: avatar and team, both chosen before the game starts.
+   *
+   * Validated against the avatar set and against THIS game's declared teams,
+   * because whatever lands here renders in every other player's lobby. A game
+   * that declares no teams rejects every team id, which is why passing one to
+   * pumpkin-carve is an error rather than a no-op.
+   */
+  app.post('/api/rooms/:code/me', async (request, reply) => {
+    const code = normalizeCode((request.params as { code: string }).code)
+    const { playerToken, avatar, team } =
+      (request.body ?? {}) as { playerToken?: unknown; avatar?: unknown; team?: unknown }
+
+    const live = store.byCode(code)
+    if (!live) return reply.code(404).send({ code: 'ROOM_NOT_FOUND' })
+
+    const caller = typeof playerToken === 'string' && playerToken.length > 0
+      ? [...live.players.values()].find(p => p.token === playerToken)
+      : undefined
+    if (!caller) return reply.code(403).send({ code: 'NOT_A_PLAYER' })
+
+    // The roster is frozen into game state at createState, so a later change
+    // would show in the lobby and mean nothing in the game. Say so instead.
+    if (live.state !== null || runtimes.get(live.id)?.hasStarted) {
+      return reply.code(409).send({ code: 'ALREADY_STARTED' })
+    }
+
+    const patch: { avatar?: string; team?: string | null } = {}
+    if (avatar !== undefined) {
+      if (!isAvatarId(avatar)) return reply.code(400).send({ code: 'BAD_AVATAR' })
+      patch.avatar = avatar
+    }
+    if (team !== undefined) {
+      const declared = getGame(live.gameId)?.teams ?? []
+      const ok = team === null || (typeof team === 'string' && declared.some(t => t.id === team))
+      if (!ok) return reply.code(400).send({ code: 'BAD_TEAM' })
+      patch.team = team
+    }
+    if (Object.keys(patch).length === 0) return { ok: true }
+
+    store.setProfile(live, caller.id, patch)
+    repo.setProfile(live.workspaceId, caller.id, patch)
+    // Everyone's lobby needs to see the change; onConnect re-broadcasts and is
+    // idempotent for an already-connected player.
+    runtimes.get(live.id)?.onConnect(caller.id)
+
+    return { ok: true }
   })
 
   app.post('/api/rooms/:code/start', async (request, reply) => {

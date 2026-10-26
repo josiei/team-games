@@ -86,6 +86,16 @@ export interface GameModule<State, Action, View> {
    * would be wrong by the time it mattered.
    */
   readonly hostActions?: readonly string[]
+
+  /**
+   * Lobby teams this game splits players into, or absent for a game played by
+   * individuals. The lobby renders team columns only when a game declares
+   * them, so adding this changes nothing for pumpkin-carve.
+   *
+   * A game that declares none rejects every team id, rather than silently
+   * accepting one it will never use.
+   */
+  readonly teams?: readonly { id: string; name: string; color: string }[]
 }
 
 /**
