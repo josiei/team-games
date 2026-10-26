@@ -6,7 +6,7 @@ import { Stage, type ClueView } from '../games/fright/Stage.js'
 const BLUE = asPlayerId('blue1')
 
 const view = (over: Partial<ClueView> = {}): ClueView => ({
-  kind: 'clue',
+  kind: 'fright-clue',
   categoryId: 'killers',
   categoryName: "Who's That Killer?",
   value: 600,

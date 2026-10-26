@@ -418,10 +418,15 @@ export function tally(state: FrightState): {
 
 export type BoardTileView = { categoryId: string; value: number; spent: boolean }
 
+/**
+ * View kinds are prefixed because the client routes on this discriminant
+ * alone, and every game would otherwise want to call its last screen
+ * 'results'. The prefix is what keeps two games' screens apart.
+ */
 export type FrightView =
   | { kind: 'lobby'; playerCount: number }
   | {
-      kind: 'board'
+      kind: 'fright-board'
       categories: { id: string; name: string }[]
       tiles: BoardTileView[]
       scores: Record<string, number>
@@ -430,7 +435,7 @@ export type FrightView =
       canPick: boolean
     }
   | {
-      kind: 'clue'
+      kind: 'fright-clue'
       categoryId: string
       categoryName: string
       value: number
@@ -452,7 +457,7 @@ export type FrightView =
       lifelines: Record<string, number>
     }
   | {
-      kind: 'reveal'
+      kind: 'fright-reveal'
       categoryName: string
       value: number
       clueKind: 'image' | 'text'
@@ -466,7 +471,7 @@ export type FrightView =
       lifelines: Record<string, number>
     }
   | {
-      kind: 'results'
+      kind: 'fright-results'
       scores: Record<string, number>
       winner: string | null
       gallery: { file: string; answer: string; categoryName: string; value: number }[]
@@ -495,7 +500,7 @@ export function viewFor(
   if (state.phase === 'results') {
     const { scores, winner } = tally(state)
     return {
-      kind: 'results',
+      kind: 'fright-results',
       scores,
       winner,
       gallery: Object.values(state.clues)
@@ -515,7 +520,7 @@ export function viewFor(
     const outcome: 'won' | 'missed' | 'no-buzz' =
       clue.wonBy !== null ? 'won' : clue.wrongIndexes.length > 0 ? 'missed' : 'no-buzz'
     return {
-      kind: 'reveal',
+      kind: 'fright-reveal',
       categoryName: state.categoryNames[clue.categoryId] ?? clue.categoryId,
       value: clue.value,
       clueKind: clue.kind,
@@ -537,7 +542,7 @@ export function viewFor(
     const armed = state.phase === 'clue' || state.phase === 'steal'
     const isAnswerer = clue.buzzedBy === viewer
     return {
-      kind: 'clue',
+      kind: 'fright-clue',
       categoryId: clue.categoryId,
       categoryName: state.categoryNames[clue.categoryId] ?? clue.categoryId,
       value: clue.value,
@@ -566,7 +571,7 @@ export function viewFor(
   }
 
   return {
-    kind: 'board',
+    kind: 'fright-board',
     categories: dedupeCategories(state),
     tiles: state.tiles.map(t => ({ ...t })),
     control: state.control,

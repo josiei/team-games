@@ -395,3 +395,97 @@
 @media (prefers-reduced-motion: reduce) {
   .buzzer, .buzzer.is-armed, .pixel-reveal { animation: none; transition: none; }
 }
+
+/* ---- Reveal and results ------------------------------------------------ */
+
+.choice.is-correct {
+  border-color: #84cc16;
+  background: rgba(132, 204, 22, 0.16);
+  box-shadow: 0 0 20px rgba(132, 204, 22, 0.4);
+}
+
+/* A tick as well as the colour: nothing is encoded in hue alone. */
+.choice.is-correct .choice-number::after { content: '\2713'; }
+
+.reveal-outcome {
+  margin: 4px 0 0;
+  text-align: center;
+  font-family: Archivo, system-ui, sans-serif;
+  font-weight: 900;
+  font-size: 1.1rem;
+  letter-spacing: 0.04em;
+  color: #ffc24d;
+}
+
+.results { display: grid; gap: 16px; justify-items: center; padding: 8px; }
+
+.results-title {
+  margin: 0;
+  font-family: Archivo, system-ui, sans-serif;
+  font-weight: 900;
+  font-size: 2rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.results-subtitle {
+  margin: 8px 0 0;
+  font-size: 0.8rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--shell-muted, #9a95ad);
+}
+
+.results-scores { display: flex; gap: 32px; }
+
+.results-score {
+  display: grid;
+  justify-items: center;
+  padding: 10px 20px;
+  border-radius: 10px;
+  border: 2px solid var(--team, #666);
+}
+
+.results-score.is-winner { box-shadow: 0 0 24px var(--team, #666); }
+
+.results-team {
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--team, #fff);
+}
+
+.results-number {
+  font-family: Archivo, system-ui, sans-serif;
+  font-weight: 900;
+  font-size: 2.2rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.results-callouts { display: grid; gap: 2px; text-align: center; color: var(--shell-muted, #9a95ad); }
+.results-callouts p { margin: 0; }
+.results-callouts strong { color: var(--shell-text, #f4f2f8); }
+
+.gallery {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  width: 100%;
+}
+
+.gallery-card {
+  display: grid;
+  gap: 2px;
+  padding-bottom: 8px;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #15102a;
+  border: 1px solid #3a2f5c;
+}
+
+.gallery-card img { width: 100%; aspect-ratio: 3 / 4; object-fit: cover; }
+.gallery-answer { padding: 0 8px; font-weight: 700; font-size: 0.85rem; }
+.gallery-meta { padding: 0 8px; font-size: 0.7rem; color: var(--shell-muted, #9a95ad); }

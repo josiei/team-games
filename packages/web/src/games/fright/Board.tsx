@@ -1,7 +1,7 @@
 import type { CSSProperties } from 'react'
 
 export type BoardView = {
-  kind: 'board'
+  kind: 'fright-board'
   categories: { id: string; name: string }[]
   tiles: { categoryId: string; value: number; spent: boolean }[]
   scores: Record<string, number>

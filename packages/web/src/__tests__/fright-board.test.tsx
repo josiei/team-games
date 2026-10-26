@@ -15,7 +15,7 @@ const CATEGORIES = [
 ]
 
 const view = (over: Partial<BoardView> = {}): BoardView => ({
-  kind: 'board',
+  kind: 'fright-board',
   categories: CATEGORIES,
   tiles: CATEGORIES.flatMap(c =>
     [100, 200].map(value => ({ categoryId: c.id, value, spent: false }))),

@@ -217,7 +217,7 @@ describe('the board view', () => {
       control: string
       categories: { id: string; name: string }[]
     }
-    expect(view.kind).toBe('board')
+    expect(view.kind).toBe('fright-board')
     expect(view.tiles.find(t => t.categoryId === 'cat-a' && t.value === 100)!.spent).toBe(true)
     expect(view.control).toBe('red')
     expect(view.categories.map(c => c.id)).toEqual(['cat-a', 'cat-b'])
@@ -230,9 +230,15 @@ describe('the board view', () => {
   })
 
   it('the board view carries no clue content at all', () => {
-    const json = JSON.stringify(viewFor(base, BLUE, PLAYERS))
-    expect(json).not.toContain('right-')
-    expect(json).not.toContain('a100')
+    const view = viewFor(base, BLUE, PLAYERS)
+    const json = JSON.stringify(view)
+    // Match the answers themselves, not a loose substring: the view kind is
+    // "fright-board", which contains "right-".
+    expect(json).not.toContain('right-a100')
+    expect(json).not.toContain('right-b100')
+    expect(json).not.toContain('"prompt"')
+    expect(json).not.toContain('"order"')
+    expect(view).not.toHaveProperty('order')
   })
 })
 
@@ -243,7 +249,7 @@ describe('reveal and results', () => {
     s = setPhase(s, 'reveal')
     const view = viewFor(s, RED, PLAYERS) as
       { kind: string; correct: number; file?: string; wonBy: string | null }
-    expect(view.kind).toBe('reveal')
+    expect(view.kind).toBe('fright-reveal')
     expect(view.correct).toBe(active(s).correct)
     expect(view.file).toBe('a100.png')
     expect(view.wonBy).toBe('blue')
@@ -270,7 +276,7 @@ describe('reveal and results', () => {
       winner: string | null
       gallery: { file: string; answer: string }[]
     }
-    expect(view.kind).toBe('results')
+    expect(view.kind).toBe('fright-results')
     expect(view.winner).toBe('blue')
     expect(view.scores).toEqual({ blue: 300, red: 100 })
     expect(view.gallery.map(g => g.file).sort()).toEqual(['a100.png', 'a200.png'])

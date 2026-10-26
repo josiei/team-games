@@ -3,7 +3,7 @@ import type { PlayerId } from '@tg/shared'
 import { PixelImage } from './PixelImage.js'
 
 export type ClueView = {
-  kind: 'clue'
+  kind: 'fright-clue'
   categoryId: string
   categoryName: string
   value: number
