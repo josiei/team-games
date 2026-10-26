@@ -1,0 +1,22 @@
+# Heroku container deploy, reusing the Dockerfile the repo already has.
+#
+# The buildpack route would need corepack/pnpm coaxing for a workspace monorepo
+# whose server runs from TypeScript source under tsx. The image already does
+# all of that correctly, so this just points Heroku at it and lets Heroku build
+# it remotely — no local Docker required.
+#
+# Two things differ from the Fly deployment the Dockerfile was written for, and
+# both are handled by config vars rather than by editing the image:
+#
+#   PORT          Heroku assigns one per dyno. The runtime environment wins over
+#                 the Dockerfile's ENV, and the server already reads PORT.
+#   DATABASE_URL  The Dockerfile points at /data, which is a Fly volume. Heroku
+#                 has no persistent disk, so set this to a path under /tmp. The
+#                 snapshot is a within-process crash net only; a dyno restart
+#                 ends every room regardless, because rooms live in memory.
+#
+# Keep this app at ONE dyno. Rooms are in memory, so a second dyno would mean
+# one room code resolving to two different rooms.
+build:
+  docker:
+    web: Dockerfile

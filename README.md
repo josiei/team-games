@@ -82,6 +82,14 @@ header avoids connection reuse. Do not remove it as a cleanup without re-testing
 Not deployed yet. Once someone runs the steps below, the target URL is
 `https://team-games.fly.dev` (it changes if the app name changes).
 
+### Running it locally while developing
+
+**Restart the server after every `pnpm build`.** The build deletes and
+recreates `packages/web/dist`, so a server started beforehand loses the files
+underneath it and answers asset requests with the SPA fallback HTML. The
+browser will not execute HTML as a module, so you get a blank white page **and
+no console error** — the hardest possible version of this bug to read.
+
 ### Deploying
 
 The server is designed to run from source under `tsx` in production
@@ -104,6 +112,32 @@ fly deploy --ha=false
 
 Do not use `fly launch`: with an existing `fly.toml` it prompts and may rewrite
 the file, dropping comments and the `[[mounts]]` block.
+
+#### Heroku
+
+The repo also carries a `heroku.yml` that builds the same Dockerfile on
+Heroku's container stack, so a deploy needs no local Docker:
+
+```bash
+heroku login
+heroku create <name> --stack container
+heroku config:set DATABASE_URL=/tmp/team-games.sqlite
+git push heroku main
+```
+
+Heroku differs from Fly in two ways that matter here, and neither is fatal for
+a one-off game night:
+
+- **No persistent disk.** `/tmp` is wiped on restart, so the SQLite snapshot is
+  a within-process crash net only. A dyno restart ends every room — but so does
+  losing the websockets, so nothing is actually lost that would have survived.
+- **Dynos cycle about once a day**, and an Eco dyno sleeps after 30 minutes
+  idle. Sleeping only costs the first player a cold start, since a live game
+  keeps the socket busy. A cycle landing inside a 25-minute game is unlikely
+  but would end it.
+
+**Never `heroku ps:scale web=2`.** Rooms live in memory; a second dyno makes one
+room code resolve to two different rooms.
 
 The app name `team-games` is globally unique on Fly and may be taken. If
 `fly apps create` rejects it, pick another name, set `app` in `fly.toml` to
