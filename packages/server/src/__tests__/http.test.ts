@@ -378,3 +378,44 @@ describe('POST /api/rooms/:code/me', () => {
     expect(store.byCode(asRoomCode(room.code))!.players.get(playerId)!.team).toBeNull()
   })
 })
+
+// Deferred from Tasks 4 and 5: both needed a registered game that declares
+// teams and a registered game that is hidden.
+describe('a game that declares teams', () => {
+  const createFright = async () => {
+    const res = await app.inject({
+      method: 'POST', url: '/api/rooms', payload: { gameId: 'fright-night-dev' },
+    })
+    return res.json() as { code: string; roomId: string }
+  }
+
+  it('GET /api/games omits a module marked hidden', async () => {
+    const res = await app.inject({ method: 'GET', url: '/api/games' })
+    const ids = (res.json() as { id: string }[]).map(g => g.id)
+    expect(ids).toContain('pumpkin-carve')
+    expect(ids).not.toContain('fright-night-dev')
+  })
+
+  it('accepts a team the game declares', async () => {
+    const room = await createFright()
+    const { playerId, playerToken } = (await join(room.code, 'Jocelyn')).json()
+    const res = await app.inject({
+      method: 'POST', url: `/api/rooms/${room.code}/me`,
+      payload: { playerToken, team: 'blue', avatar: 'vampire' },
+    })
+    expect(res.statusCode).toBe(200)
+    const live = store.byCode(asRoomCode(room.code))!
+    expect(live.players.get(playerId)).toMatchObject({ team: 'blue', avatar: 'vampire' })
+  })
+
+  it('still rejects a team it does not declare', async () => {
+    const room = await createFright()
+    const { playerToken } = (await join(room.code, 'Jocelyn')).json()
+    const res = await app.inject({
+      method: 'POST', url: `/api/rooms/${room.code}/me`,
+      payload: { playerToken, team: 'green' },
+    })
+    expect(res.statusCode).toBe(400)
+    expect(res.json().code).toBe('BAD_TEAM')
+  })
+})

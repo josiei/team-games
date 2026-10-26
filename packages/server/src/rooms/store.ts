@@ -11,6 +11,14 @@ export type RoomConfig = { phaseMs: Record<string, number> }
 
 const FALLBACK_CARVE_MS = 180_000
 const FALLBACK_VOTE_MS = 15_000
+// Fright Night. `steal` is a shorter `clue` and nothing more: phaseMs is keyed
+// by phase name, so a step that needs two durations needs two names.
+const FALLBACK_BOARD_MS = 30_000
+const FALLBACK_READ_MS = 6_000
+const FALLBACK_CLUE_MS = 20_000
+const FALLBACK_STEAL_MS = 12_000
+const FALLBACK_ANSWER_MS = 12_000
+const FALLBACK_REVEAL_MS = 6_000
 /** setTimeout cannot take more than a signed 32-bit int. */
 const MAX_TIMER_MS = 2 ** 31 - 1
 
@@ -21,9 +29,13 @@ function envMs(value: string | undefined, fallback: number): number {
 }
 
 /**
- * Phase timings, tunable per deploy without a code change: CARVE_MS for the
- * carving phase and VOTE_MS for each of the four vote phases. Unset or invalid
- * values fall back to 180_000 / 15_000.
+ * Phase timings, tunable per deploy without a code change, so a playtest can
+ * retune pacing without touching code.
+ *
+ * pumpkin-carve: CARVE_MS, VOTE_MS (each of the four vote phases).
+ * fright-night: BOARD_MS, READ_MS, CLUE_MS, STEAL_MS, ANSWER_MS, REVEAL_MS.
+ *
+ * Unset or invalid values fall back to the constants above.
  */
 export function roomConfigFromEnv(env: Record<string, string | undefined> = process.env): RoomConfig {
   const carve = envMs(env.CARVE_MS, FALLBACK_CARVE_MS)
@@ -35,6 +47,12 @@ export function roomConfigFromEnv(env: Record<string, string | undefined> = proc
       'vote-funniest': vote,
       'vote-craft': vote,
       'vote-cursed': vote,
+      board: envMs(env.BOARD_MS, FALLBACK_BOARD_MS),
+      reading: envMs(env.READ_MS, FALLBACK_READ_MS),
+      clue: envMs(env.CLUE_MS, FALLBACK_CLUE_MS),
+      steal: envMs(env.STEAL_MS, FALLBACK_STEAL_MS),
+      answer: envMs(env.ANSWER_MS, FALLBACK_ANSWER_MS),
+      reveal: envMs(env.REVEAL_MS, FALLBACK_REVEAL_MS),
     },
   }
 }
