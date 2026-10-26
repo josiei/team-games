@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { CODE_LENGTH } from '@tg/shared'
 import { createRoom, errorCode, humanize, joinRoom, type JoinResult } from './api.js'
+import { GamePicker } from './GamePicker.js'
 import { pickTagline } from './taglines.js'
 import { NeonSign } from '../ui/NeonSign.js'
 import { Spiral } from '../ui/Spiral.js'
@@ -15,6 +16,7 @@ export function JoinScreen({
   const [name, setName] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const [picking, setPicking] = useState(false)
   // Chosen once per mount: the line must not change under the reader mid-visit.
   const [tagline] = useState(pickTagline)
 
@@ -27,13 +29,20 @@ export function JoinScreen({
     finally { setBusy(false) }
   }
 
-  async function host() {
+  async function host(gameId: string) {
+    setPicking(false)
     setBusy(true); setError(null)
     try {
-      const room = await createRoom('pumpkin-carve')
+      const room = await createRoom(gameId)
       setCode(room.code)
       onJoined(room.code, await joinRoom(room.code, name.trim()), name.trim())
     } catch (e) { setError(errorCode(e)) } finally { setBusy(false) }
+  }
+
+  // Choosing the game comes before the room exists, so the picker replaces this
+  // screen rather than sitting inside it.
+  if (picking) {
+    return <GamePicker onPick={gameId => void host(gameId)} onCancel={() => setPicking(false)} />
   }
 
   return (
@@ -58,7 +67,7 @@ export function JoinScreen({
               Join game
             </button>
             <button className="btn-ghost" disabled={name.trim().length === 0 || busy}
-              onClick={host}>
+              onClick={() => setPicking(true)}>
               Start a new room
             </button>
           </div>
