@@ -8,7 +8,7 @@ const [A, B, C] = ['pa', 'pb', 'pc'].map(asPlayerId) as [
   ReturnType<typeof asPlayerId>, ReturnType<typeof asPlayerId>, ReturnType<typeof asPlayerId>,
 ]
 const player = (id: ReturnType<typeof asPlayerId>, i: number): Player =>
-  ({ id, displayName: `p${i}`, connected: true, joinedAt: i + 1 })
+  ({ id, displayName: `p${i}`, connected: true, joinedAt: i + 1 , avatar: '', team: null})
 const players = [player(A, 0), player(B, 1), player(C, 2)]
 const strokes: Stroke[] = [{ tool: 'cut', size: 0.1, points: [[0.5, 0.5]] }]
 

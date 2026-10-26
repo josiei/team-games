@@ -6,6 +6,14 @@ export type Player = {
   displayName: string
   connected: boolean
   joinedAt: number
+  /** An id from AVATARS, or '' before the player has chosen one. */
+  avatar: string
+  /**
+   * The lobby group this player joined, or null for no team and for games
+   * that declare none. Generic on purpose: the team is picked in the lobby,
+   * before game state exists, so it cannot live in a game's own state.
+   */
+  team: string | null
 }
 
 export type GameTheme = {

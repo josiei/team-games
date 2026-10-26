@@ -9,7 +9,7 @@ const [A, B, C] = IDS.map(asPlayerId) as [
   ReturnType<typeof asPlayerId>, ReturnType<typeof asPlayerId>, ReturnType<typeof asPlayerId>,
 ]
 const players = IDS.map((id, i) =>
-  ({ id: asPlayerId(id), displayName: `p${i}`, connected: true, joinedAt: i + 1 }))
+  ({ id: asPlayerId(id), displayName: `p${i}`, connected: true, joinedAt: i + 1 , avatar: '', team: null}))
 
 const deep: Stroke[] = Array.from({ length: 40 }, (_, i) => ({
   tool: 'cut' as const, size: 0.3,

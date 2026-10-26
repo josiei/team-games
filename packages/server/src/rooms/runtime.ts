@@ -228,7 +228,10 @@ export class RoomRuntime {
 
   snapshotFor(playerId: PlayerId): ServerMessage {
     const players = [...this.room.players.values()].map(p =>
-      ({ id: p.id, displayName: p.displayName, connected: p.connected, joinedAt: p.joinedAt }))
+      ({
+        id: p.id, displayName: p.displayName, connected: p.connected,
+        joinedAt: p.joinedAt, avatar: p.avatar, team: p.team,
+      }))
     return {
       type: 'snapshot',
       phase: this.room.phase,

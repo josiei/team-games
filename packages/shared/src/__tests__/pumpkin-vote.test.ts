@@ -3,7 +3,7 @@ import { createState, reduce, setPhase, slotOf, tally } from '../pumpkin.js'
 import { asPlayerId } from '../ids.js'
 
 const player = (id: string, joinedAt: number) =>
-  ({ id: asPlayerId(id), displayName: id, connected: true, joinedAt })
+  ({ id: asPlayerId(id), displayName: id, connected: true, joinedAt, avatar: '', team: null })
 
 const A = asPlayerId('a'), B = asPlayerId('b'), C = asPlayerId('c')
 const three = [player('a', 1), player('b', 2), player('c', 3)]

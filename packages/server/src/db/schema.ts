@@ -43,6 +43,10 @@ export const players = sqliteTable('player', {
   token: text('token').notNull(),
   connected: integer('connected', { mode: 'boolean' }).notNull().default(true),
   joinedAt: integer('joined_at').notNull(),
+  // Lobby profile. Generic across games: a game that declares no teams simply
+  // leaves `team` null.
+  avatar: text('avatar').notNull().default(''),
+  team: text('team'),
 }, t => [index('player_token_idx').on(t.workspaceId, t.token)])
 
 export const gameResults = sqliteTable('game_result', {

@@ -13,8 +13,8 @@ const setView = (over: Record<string, unknown> = {}) =>
   useConnection.setState({
     status: 'open', phase: 'results', me: ME,
     players: [
-      { id: ME, displayName: 'Jocelyn', connected: true, joinedAt: 1 },
-      { id: OTHER, displayName: 'Jocelyn', connected: true, joinedAt: 2 },
+      { id: ME, displayName: 'Jocelyn', connected: true, joinedAt: 1, avatar: '', team: null },
+      { id: OTHER, displayName: 'Jocelyn', connected: true, joinedAt: 2, avatar: '', team: null },
     ],
     labels: { me: 'Jocelyn', other: 'Jocelyn (2)' },
     hostId: ME, hostLine: null, endsAt: null, clockOffset: 0,

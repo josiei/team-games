@@ -109,3 +109,39 @@ describe('a restored room gets its clock back', () => {
     await until(() => room.phase === 'vote-scariest')
   })
 })
+
+describe('restore keeps player profiles', () => {
+  it('a restored room keeps each player avatar and team', () => {
+    const repo = new Repo(createDb(':memory:'))
+    const first = new InMemoryRoomStore()
+    const workspaceId = repo.ensureDefaultWorkspace()
+    const row = repo.createRoom({
+      workspaceId, code: asRoomCode('AB2CD3'), gameId: 'pumpkin-carve',
+    })
+    const room = first.create({
+      workspaceId, code: row.code, gameId: row.gameId, id: row.id,
+    })
+    const a = first.addPlayer(room, { displayName: 'A', token: newId() })
+    const b = first.addPlayer(room, { displayName: 'B', token: newId() })
+    for (const p of [a, b]) {
+      repo.addPlayer({
+        workspaceId, roomId: room.id, displayName: p.displayName,
+        token: p.token, id: p.id, joinedAt: p.joinedAt,
+      })
+    }
+    first.setProfile(room, a.id, { avatar: 'vampire', team: 'blue' })
+    repo.setProfile(workspaceId, a.id, { avatar: 'vampire', team: 'blue' })
+    first.setProfile(room, b.id, { avatar: 'pumpkin', team: 'red' })
+    repo.setProfile(workspaceId, b.id, { avatar: 'pumpkin', team: 'red' })
+    repo.saveSnapshot({
+      workspaceId, roomId: room.id, phase: 'carving', state: {},
+      participants: [a.id, b.id], endsAt: null,
+    })
+
+    const store = new InMemoryRoomStore()
+    expect(restoreRooms(repo, store)).toBe(1)
+    const restored = store.byCode(asRoomCode('AB2CD3'))!
+    expect(restored.players.get(a.id)).toMatchObject({ avatar: 'vampire', team: 'blue' })
+    expect(restored.players.get(b.id)).toMatchObject({ avatar: 'pumpkin', team: 'red' })
+  })
+})

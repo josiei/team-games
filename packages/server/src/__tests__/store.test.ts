@@ -206,3 +206,41 @@ describe('roomConfigFromEnv', () => {
     }
   })
 })
+
+describe('avatar and team', () => {
+  it('a new player starts with no avatar and no team', () => {
+    const room = make()
+    const p = store.addPlayer(room, { displayName: 'A', token: newId() })
+    expect(p.avatar).toBe('')
+    expect(p.team).toBeNull()
+  })
+
+  it('setProfile updates avatar and team on the live player', () => {
+    const room = make()
+    const p = store.addPlayer(room, { displayName: 'A', token: newId() })
+    store.setProfile(room, p.id, { avatar: 'vampire', team: 'blue' })
+    expect(room.players.get(p.id)!.avatar).toBe('vampire')
+    expect(room.players.get(p.id)!.team).toBe('blue')
+  })
+
+  it('setProfile leaves a field alone when the patch omits it', () => {
+    const room = make()
+    const p = store.addPlayer(room, { displayName: 'A', token: newId() })
+    store.setProfile(room, p.id, { avatar: 'ghost', team: 'red' })
+    store.setProfile(room, p.id, { avatar: 'bat' })
+    expect(room.players.get(p.id)!.team).toBe('red')
+  })
+
+  it('setProfile can clear a team with null', () => {
+    const room = make()
+    const p = store.addPlayer(room, { displayName: 'A', token: newId() })
+    store.setProfile(room, p.id, { team: 'blue' })
+    store.setProfile(room, p.id, { team: null })
+    expect(room.players.get(p.id)!.team).toBeNull()
+  })
+
+  it('setProfile on an unknown player changes nothing', () => {
+    const room = make()
+    expect(() => store.setProfile(room, newId() as never, { avatar: 'owl' })).not.toThrow()
+  })
+})

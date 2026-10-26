@@ -75,6 +75,11 @@ export interface RoomStore {
   all(): LiveRoom[]
   addPlayer(room: LiveRoom, input: { displayName: string; token: string }): RoomPlayer
   setConnected(room: LiveRoom, playerId: PlayerId, connected: boolean): void
+  /** Lobby profile. An omitted field is left as it was; `team: null` clears it. */
+  setProfile(
+    room: LiveRoom, playerId: PlayerId,
+    patch: { avatar?: string; team?: string | null },
+  ): void
   /** Everyone who was present when the game started, in join order. */
   participants(room: LiveRoom): RoomPlayer[]
   /** Host moves to the longest-connected player; null only if nobody is connected. */
@@ -137,6 +142,8 @@ export class InMemoryRoomStore implements RoomStore {
       joinedAt: Math.max(Date.now(), latest + 1),
       token: input.token,
       spectator: room.phase !== 'lobby',
+      avatar: '',
+      team: null,
     }
     room.players.set(player.id, player)
     if (!room.hostId) this.reassignHostIfNeeded(room)
@@ -146,6 +153,16 @@ export class InMemoryRoomStore implements RoomStore {
   setConnected(room: LiveRoom, playerId: PlayerId, connected: boolean): void {
     const player = room.players.get(playerId)
     if (player) player.connected = connected
+  }
+
+  setProfile(
+    room: LiveRoom, playerId: PlayerId,
+    patch: { avatar?: string; team?: string | null },
+  ): void {
+    const player = room.players.get(playerId)
+    if (!player) return
+    if (patch.avatar !== undefined) player.avatar = patch.avatar
+    if (patch.team !== undefined) player.team = patch.team
   }
 
   /** Participants are everyone who was present when the game started. */

@@ -40,6 +40,8 @@ export function restoreRooms(repo: Repo, store: InMemoryRoomStore): number {
         joinedAt: player.joinedAt,
         token: player.token,
         spectator: participants ? !participants.has(id) : false,
+        avatar: player.avatar,
+        team: player.team,
       }
       room.players.set(id, entry)
     }

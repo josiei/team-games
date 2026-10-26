@@ -10,7 +10,7 @@ const ME = asPlayerId('me')
 const OTHER = asPlayerId('other')
 
 const player = (id: ReturnType<typeof asPlayerId>, name: string, joinedAt: number) =>
-  ({ id, displayName: name, connected: true, joinedAt })
+  ({ id, displayName: name, connected: true, joinedAt, avatar: '', team: null })
 
 beforeEach(() => {
   useConnection.setState({

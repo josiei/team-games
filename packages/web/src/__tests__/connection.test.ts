@@ -53,7 +53,9 @@ describe('backoffMs', () => {
 describe('applyMessage', () => {
   const snapshot = (over: Record<string, unknown> = {}) => ({
     type: 'snapshot' as const, phase: 'carving', view: { kind: 'carving' },
-    players: [{ id: ME, displayName: 'Me', connected: true, joinedAt: 1 }],
+    players: [{
+      id: ME, displayName: 'Me', connected: true, joinedAt: 1, avatar: '', team: null,
+    }],
     labels: { me: 'Me' }, hostId: ME, endsAt: null, serverNow: 0,
     ...over,
   })
