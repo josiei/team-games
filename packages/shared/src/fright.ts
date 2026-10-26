@@ -68,6 +68,8 @@ export type FrightState = {
   lifelines: Record<string, number>
   control: string
   tiles: Tile[]
+  /** Category id -> display name, so a view never has to carry the pack. */
+  categoryNames: Record<string, string>
   /** Every clue on the board, keyed `${categoryId}:${value}`. */
   clues: Record<string, ActiveClue>
   active: string | null
@@ -90,7 +92,9 @@ export function makeCreateState(pack: Pack, teamIds: readonly string[]) {
 
     const tiles: Tile[] = []
     const clues: Record<string, ActiveClue> = {}
+    const categoryNames: Record<string, string> = {}
     for (const category of pack.categories) {
+      categoryNames[category.id] = category.name
       for (const clue of category.clues) {
         const key = clueKey(category.id, clue.value)
         tiles.push({ categoryId: category.id, value: clue.value, spent: false })
@@ -124,6 +128,7 @@ export function makeCreateState(pack: Pack, teamIds: readonly string[]) {
       // Deterministic from the seed, so a restart restores the same game.
       control: ids[seed % ids.length]!,
       tiles,
+      categoryNames,
       clues,
       active: null,
       buzzCount: {},
@@ -324,4 +329,259 @@ export function reduce(
     default:
       return state
   }
+}
+
+/**
+ * Where the room goes when `current` ends.
+ *
+ * This is the method the board needed and a linear phase list could not
+ * express: `board` is revisited once per tile, in whatever order the players
+ * pick, and `steal` loops back into `answer`.
+ */
+export function nextPhase(state: FrightState, current: string): string | null {
+  const clue = state.active ? state.clues[state.active] ?? null : null
+  const tilesLeft = state.tiles.some(t => !t.spent)
+
+  switch (current) {
+    case 'lobby':
+      return 'board'
+
+    case 'board':
+      // Nothing left to pick: the host ended the game, or the last reveal
+      // spent the final tile while this phase was still on screen.
+      return tilesLeft || state.active !== null ? 'reading' : 'results'
+
+    case 'reading':
+      return 'clue'
+
+    case 'clue':
+    case 'steal':
+      // A buzz landed, so somebody owes an answer; otherwise show the answer.
+      return clue?.buzzedBy ? 'answer' : 'reveal'
+
+    case 'answer': {
+      if (!clue) return 'reveal'
+      // Right, or both teams out of shots: the clue is finished either way.
+      if (clue.wonBy !== null) return 'reveal'
+      const everyoneTried = state.teamIds.every(id => clue.spentTeams.includes(id))
+      return everyoneTried ? 'reveal' : 'steal'
+    }
+
+    case 'reveal':
+      return tilesLeft ? 'board' : 'results'
+
+    default:
+      return null
+  }
+}
+
+/**
+ * Whether this phase has nothing left to wait for.
+ *
+ * The runtime adds its own 700ms beat before acting on this, which is wanted
+ * here: the room sees "Blue buzzed!" before the buttons come alive.
+ */
+export function phaseComplete(
+  state: FrightState, phase: string, players: Player[],
+): boolean {
+  const clue = state.active ? state.clues[state.active] ?? null : null
+
+  switch (phase) {
+    case 'board':
+      return state.active !== null
+    case 'clue':
+    case 'steal':
+      return clue?.buzzedBy != null
+    case 'answer': {
+      if (!clue || clue.buzzedTeam === null) return true
+      // The shot is spent the moment an answer lands.
+      if (clue.spentTeams.includes(clue.buzzedTeam)) return true
+      // Nobody can answer for them, so waiting out the clock is dead air.
+      return !players.some(p => p.id === clue.buzzedBy)
+    }
+    default:
+      // `reading` runs its full clock on purpose: it is the window that makes
+      // the buzzer race about reading speed rather than reflexes.
+      return false
+  }
+}
+
+/** Final scores, and the winner — or null, because a tie is shown as a tie. */
+export function tally(state: FrightState): {
+  scores: Record<string, number>
+  winner: string | null
+} {
+  const best = Math.max(...state.teamIds.map(id => state.scores[id] ?? 0))
+  const leaders = state.teamIds.filter(id => (state.scores[id] ?? 0) === best)
+  return { scores: state.scores, winner: leaders.length === 1 ? leaders[0]! : null }
+}
+
+export type BoardTileView = { categoryId: string; value: number; spent: boolean }
+
+export type FrightView =
+  | { kind: 'lobby'; playerCount: number }
+  | {
+      kind: 'board'
+      categories: { id: string; name: string }[]
+      tiles: BoardTileView[]
+      scores: Record<string, number>
+      lifelines: Record<string, number>
+      control: string
+      canPick: boolean
+    }
+  | {
+      kind: 'clue'
+      categoryId: string
+      categoryName: string
+      value: number
+      clueKind: 'image' | 'text'
+      prompt: string
+      file?: string
+      mosaic?: number
+      order: string[]
+      armed: boolean
+      canBuzz: boolean
+      canChoose: boolean
+      canLifeline: boolean
+      answeringId: PlayerId | null
+      answeringTeam: string | null
+      wrongIndexes: number[]
+      /** This viewer's OWN team's eliminations. Never anyone else's. */
+      myEliminated: number[]
+      scores: Record<string, number>
+      lifelines: Record<string, number>
+    }
+  | {
+      kind: 'reveal'
+      categoryName: string
+      value: number
+      clueKind: 'image' | 'text'
+      prompt: string
+      file?: string
+      order: string[]
+      correct: number
+      wonBy: string | null
+      outcome: 'won' | 'missed' | 'no-buzz'
+      scores: Record<string, number>
+      lifelines: Record<string, number>
+    }
+  | {
+      kind: 'results'
+      scores: Record<string, number>
+      winner: string | null
+      gallery: { file: string; answer: string; categoryName: string; value: number }[]
+      buzzCount: Record<string, number>
+      correctCount: Record<string, number>
+    }
+
+/**
+ * One view per viewer, built field by field.
+ *
+ * **Never spread an ActiveClue into a view.** Spreading is how `correct` and
+ * the other team's `eliminated` would escape, and both of those are the whole
+ * reason this function exists rather than shipping raw state.
+ */
+export function viewFor(
+  state: FrightState, viewer: PlayerId, _players?: Player[],
+): FrightView {
+  const myTeam = state.teams[viewer] ?? null
+  const clue = state.active ? state.clues[state.active] ?? null : null
+  const money = { scores: state.scores, lifelines: state.lifelines }
+
+  if (state.phase === 'lobby') {
+    return { kind: 'lobby', playerCount: Object.keys(state.teams).length }
+  }
+
+  if (state.phase === 'results') {
+    const { scores, winner } = tally(state)
+    return {
+      kind: 'results',
+      scores,
+      winner,
+      gallery: Object.values(state.clues)
+        .filter(c => c.kind === 'image' && c.file)
+        .map(c => ({
+          file: c.file!,
+          answer: c.order[c.correct]!,
+          categoryName: state.categoryNames[c.categoryId] ?? c.categoryId,
+          value: c.value,
+        })),
+      buzzCount: { ...state.buzzCount },
+      correctCount: { ...state.correctCount },
+    }
+  }
+
+  if (state.phase === 'reveal' && clue) {
+    const outcome: 'won' | 'missed' | 'no-buzz' =
+      clue.wonBy !== null ? 'won' : clue.wrongIndexes.length > 0 ? 'missed' : 'no-buzz'
+    return {
+      kind: 'reveal',
+      categoryName: state.categoryNames[clue.categoryId] ?? clue.categoryId,
+      value: clue.value,
+      clueKind: clue.kind,
+      prompt: clue.prompt,
+      ...(clue.file ? { file: clue.file } : {}),
+      order: clue.order,
+      correct: clue.correct,          // the one place this is allowed out
+      wonBy: clue.wonBy,
+      outcome,
+      ...money,
+    }
+  }
+
+  const onClue = clue
+    && (state.phase === 'reading' || state.phase === 'clue'
+      || state.phase === 'steal' || state.phase === 'answer')
+
+  if (onClue) {
+    const armed = state.phase === 'clue' || state.phase === 'steal'
+    const isAnswerer = clue.buzzedBy === viewer
+    return {
+      kind: 'clue',
+      categoryId: clue.categoryId,
+      categoryName: state.categoryNames[clue.categoryId] ?? clue.categoryId,
+      value: clue.value,
+      clueKind: clue.kind,
+      prompt: clue.prompt,
+      ...(clue.file ? { file: clue.file } : {}),
+      ...(clue.mosaic !== undefined ? { mosaic: clue.mosaic } : {}),
+      order: clue.order,
+      armed,
+      canBuzz: armed && myTeam !== null
+        && clue.buzzedBy === null && !clue.spentTeams.includes(myTeam),
+      canChoose: state.phase === 'answer' && isAnswerer
+        && clue.buzzedTeam !== null && !clue.spentTeams.includes(clue.buzzedTeam),
+      canLifeline: state.phase === 'answer' && isAnswerer
+        && clue.buzzedTeam !== null
+        && (state.lifelines[clue.buzzedTeam] ?? 0) > 0
+        && clue.eliminated[clue.buzzedTeam] === undefined,
+      answeringId: clue.buzzedBy,
+      answeringTeam: clue.buzzedTeam,
+      wrongIndexes: clue.wrongIndexes,
+      // Own team only. Giving the other team these would hand the steal a
+      // narrowed field and undo the point of a private lifeline.
+      myEliminated: myTeam !== null ? clue.eliminated[myTeam] ?? [] : [],
+      ...money,
+    }
+  }
+
+  return {
+    kind: 'board',
+    categories: dedupeCategories(state),
+    tiles: state.tiles.map(t => ({ ...t })),
+    control: state.control,
+    canPick: myTeam !== null && myTeam === state.control,
+    ...money,
+  }
+}
+
+/** Category order, taken from the tiles so the board renders left to right. */
+function dedupeCategories(state: FrightState): { id: string; name: string }[] {
+  const seen: { id: string; name: string }[] = []
+  for (const tile of state.tiles) {
+    if (!seen.some(c => c.id === tile.categoryId)) {
+      seen.push({ id: tile.categoryId, name: state.categoryNames[tile.categoryId] ?? tile.categoryId })
+    }
+  }
+  return seen
 }
