@@ -16,7 +16,7 @@
         {
           "value": 200,
           "kind": "image",
-          "file": "/games/fright-night/clues/3c7acff3aaabc25b.jpg",
+          "file": "/games/fright-night/clues/483a9c847367da10.jpg",
           "mosaic": 10,
           "prompt": "Who is this?",
           "choices": [
@@ -33,7 +33,7 @@
         {
           "value": 400,
           "kind": "image",
-          "file": "/games/fright-night/clues/ce6db775495f03a4.jpg",
+          "file": "/games/fright-night/clues/7786dc3f4cb41d53.jpg",
           "mosaic": 12,
           "prompt": "Who is this?",
           "choices": [
@@ -50,7 +50,7 @@
         {
           "value": 600,
           "kind": "image",
-          "file": "/games/fright-night/clues/deeea1086216acb4.jpg",
+          "file": "/games/fright-night/clues/892c342d7598c8bc.jpg",
           "mosaic": 14,
           "prompt": "Who is this?",
           "choices": [
@@ -67,7 +67,7 @@
         {
           "value": 800,
           "kind": "image",
-          "file": "/games/fright-night/clues/cdd437a2d20bb4a7.jpg",
+          "file": "/games/fright-night/clues/245f86629666e08f.jpg",
           "mosaic": 18,
           "prompt": "Who is this?",
           "choices": [
@@ -86,7 +86,7 @@
         {
           "value": 1000,
           "kind": "image",
-          "file": "/games/fright-night/clues/02d79d8aa9490f60.jpg",
+          "file": "/games/fright-night/clues/52468d33cb202974.jpg",
           "mosaic": 22,
           "prompt": "Who is this?",
           "choices": [
@@ -111,7 +111,7 @@
         {
           "value": 200,
           "kind": "image",
-          "file": "/games/fright-night/clues/b93622c087fa587b.jpg",
+          "file": "/games/fright-night/clues/e476d245e4b5d47c.jpg",
           "mosaic": 24,
           "prompt": "What treat is this?",
           "choices": [
@@ -128,7 +128,7 @@
         {
           "value": 400,
           "kind": "image",
-          "file": "/games/fright-night/clues/095ab4cb2d88abe4.jpg",
+          "file": "/games/fright-night/clues/c0cf6863513aeac3.jpg",
           "mosaic": 16,
           "prompt": "What treat is this?",
           "choices": [
@@ -145,7 +145,7 @@
         {
           "value": 600,
           "kind": "image",
-          "file": "/games/fright-night/clues/e9ddd2b71625c496.jpg",
+          "file": "/games/fright-night/clues/3d308531939024b1.jpg",
           "mosaic": 20,
           "prompt": "What treat is this?",
           "choices": [
@@ -162,7 +162,7 @@
         {
           "value": 800,
           "kind": "image",
-          "file": "/games/fright-night/clues/5977846a2fc2d3c3.jpg",
+          "file": "/games/fright-night/clues/ffad7a945ab51f70.jpg",
           "mosaic": 12,
           "prompt": "What treat is this?",
           "choices": [
@@ -181,7 +181,7 @@
         {
           "value": 1000,
           "kind": "image",
-          "file": "/games/fright-night/clues/786b13d38fdb3e51.jpg",
+          "file": "/games/fright-night/clues/bf5660b6b58bb6c3.jpg",
           "mosaic": 10,
           "prompt": "What treat is this?",
           "choices": [

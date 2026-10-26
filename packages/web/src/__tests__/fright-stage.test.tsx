@@ -204,3 +204,18 @@ describe('what the room sees', () => {
     expect(container.querySelector('canvas')).toBeTruthy()
   })
 })
+
+describe('an image clue that has not arrived yet', () => {
+  it('shows a placeholder rather than an empty box', () => {
+    // The canvas only paints in image.onload. On conference wifi that can be
+    // most of the clue, and the spec promises a placeholder meanwhile.
+    const { container } = render(
+      <Stage view={view({ clueKind: 'image', file: 'x.png', mosaic: 10 })} {...noop} />)
+    expect(container.querySelector('.pixel-placeholder')).toBeTruthy()
+  })
+
+  it('still renders the prompt, so the clue runs on its text', () => {
+    render(<Stage view={view({ clueKind: 'image', file: 'x.png', mosaic: 10 })} {...noop} />)
+    expect(screen.getByText(/Transylvanian count/)).toBeTruthy()
+  })
+})

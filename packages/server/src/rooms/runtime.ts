@@ -123,6 +123,14 @@ export class RoomRuntime {
       return
     }
     if (next === undefined || next === null) return
+
+    // Reference equality means the reducer rejected the action. Every guard
+    // in a pure reducer bails this way, and losing a buzzer race is the
+    // commonest path of all — persisting and re-broadcasting the whole state
+    // for each losing press would load the event loop with exactly the
+    // traffic that decides who got there first.
+    if (next === this.room.state) return
+
     this.room.state = next
 
     // Persist before the early returns below, so DRAFT saves too and an

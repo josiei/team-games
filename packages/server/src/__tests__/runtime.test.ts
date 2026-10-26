@@ -806,3 +806,47 @@ describe('hostActions', () => {
     r.dispose()
   })
 })
+
+describe('a rejected action costs nothing', () => {
+  /**
+   * Every fright guard rejects by returning the state unchanged, and losing a
+   * buzzer race is the commonest path through this code. Persisting and
+   * re-broadcasting a 30-clue state for each losing press would load the
+   * event loop with exactly the traffic that decides who was first.
+   */
+  it('does not broadcast when the reducer changes nothing', () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const mod: GameModule<any, any, any> = {
+      ...pumpkinModule,
+      reduce: (state: unknown) => state,          // every action is a no-op
+    }
+    const room = store.all()[0]!
+    const r = new RoomRuntime({
+      room, store, repo, module: mod,
+      send: (to, message) => sent.push({ to, message }),
+    })
+    r.start()
+    sent.length = 0
+    r.dispatch(ids[0]!, { type: 'ANYTHING' })
+    expect(sent).toEqual([])
+    r.dispose()
+  })
+
+  it('still broadcasts when the reducer does change something', () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const mod: GameModule<any, any, any> = {
+      ...pumpkinModule,
+      reduce: (state: object) => ({ ...state }),
+    }
+    const room = store.all()[0]!
+    const r = new RoomRuntime({
+      room, store, repo, module: mod,
+      send: (to, message) => sent.push({ to, message }),
+    })
+    r.start()
+    sent.length = 0
+    r.dispatch(ids[0]!, { type: 'ANYTHING' })
+    expect(sent.filter(s => s.message.type === 'snapshot').length).toBeGreaterThan(0)
+    r.dispose()
+  })
+})

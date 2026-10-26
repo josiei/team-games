@@ -259,6 +259,21 @@
   box-shadow: 0 0 0 2px rgba(255, 117, 24, 0.5), 0 10px 30px rgba(0, 0, 0, 0.6);
 }
 
+.pixel-placeholder {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 6px;
+  background: repeating-linear-gradient(
+    45deg, #1b1338 0 10px, #241a46 10px 20px);
+  box-shadow: 0 0 0 2px rgba(255, 117, 24, 0.5);
+  color: var(--shell-muted, #9a95ad);
+  font-size: 0.8rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
 .pixel-reveal {
   image-rendering: auto;   /* the un-pixelated photograph */
   position: absolute;

@@ -170,18 +170,36 @@ export function setPhase(state: FrightState, phase: string): FrightState {
     }
   }
 
-  // A steal re-arms the buzzer for whoever has a shot left. Without clearing
-  // the previous buzz the clue stays owned by the team that just missed, and
-  // nobody can ring in at all.
-  if (phase === 'steal' && state.active !== null) {
+  // Leaving `answer` settles up, whichever way it ends.
+  //
+  // A team still holding the buzzer when this phase ends never reached
+  // CHOOSE, so nothing else would ever append to spentTeams — and without
+  // that, the clue cycles answer -> steal -> answer with the same team
+  // re-buzzing for as long as they keep doing it. One player who buzzes and
+  // then walks away from their laptop would freeze the clue and deny the
+  // other team the steal entirely. Running out the clock is a forfeit
+  // (spec 8.4), not a free retry.
+  //
+  // Both exits need it: `steal` so the other team gets a clean buzzer, and
+  // `reveal` so the second team's timeout is recorded too.
+  if ((phase === 'steal' || phase === 'reveal') && state.active !== null) {
     const clue = state.clues[state.active]
-    if (clue) {
+    if (clue && clue.buzzedTeam !== null) {
+      const forfeited = !clue.spentTeams.includes(clue.buzzedTeam)
       return {
         ...state,
         phase,
         clues: {
           ...state.clues,
-          [state.active]: { ...clue, buzzedBy: null, buzzedTeam: null },
+          [state.active]: {
+            ...clue,
+            spentTeams: forfeited
+              ? [...clue.spentTeams, clue.buzzedTeam]
+              : clue.spentTeams,
+            // Cleared on a steal so the remaining team can ring in. Kept on a
+            // reveal: the screen names who answered.
+            ...(phase === 'steal' ? { buzzedBy: null, buzzedTeam: null } : {}),
+          },
         },
       }
     }
@@ -363,8 +381,13 @@ export function nextPhase(state: FrightState, current: string): string | null {
       if (!clue) return 'reveal'
       // Right, or both teams out of shots: the clue is finished either way.
       if (clue.wonBy !== null) return 'reveal'
-      const everyoneTried = state.teamIds.every(id => clue.spentTeams.includes(id))
-      return everyoneTried ? 'reveal' : 'steal'
+      // This runs BEFORE setPhase, so the team still holding the buzzer has
+      // not been marked spent yet — but it is about to be, whether it
+      // answered or let the clock run out. Count it, or the second team's
+      // timeout would open a dead `steal` nobody is allowed to buzz in.
+      const tried = new Set(clue.spentTeams)
+      if (clue.buzzedTeam !== null) tried.add(clue.buzzedTeam)
+      return state.teamIds.every(id => tried.has(id)) ? 'reveal' : 'steal'
     }
 
     case 'reveal':
@@ -388,7 +411,10 @@ export function phaseComplete(
 
   switch (phase) {
     case 'board':
-      return state.active !== null
+      // Nothing left to open — the host pressed End, or the last tile went on
+      // the previous clue. Waiting out BOARD_MS would be dead air with an
+      // empty grid on screen.
+      return state.active !== null || state.tiles.every(t => t.spent)
     case 'clue':
     case 'steal':
       return clue?.buzzedBy != null
@@ -517,8 +543,11 @@ export function viewFor(
   }
 
   if (state.phase === 'reveal' && clue) {
+    // spentTeams, not wrongIndexes: a team that buzzed and let the clock run
+    // out has spent its shot without ever producing a wrong index, and the
+    // room should not be told nobody rang in.
     const outcome: 'won' | 'missed' | 'no-buzz' =
-      clue.wonBy !== null ? 'won' : clue.wrongIndexes.length > 0 ? 'missed' : 'no-buzz'
+      clue.wonBy !== null ? 'won' : clue.spentTeams.length > 0 ? 'missed' : 'no-buzz'
     return {
       kind: 'fright-reveal',
       categoryName: state.categoryNames[clue.categoryId] ?? clue.categoryId,

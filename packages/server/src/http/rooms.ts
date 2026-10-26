@@ -149,8 +149,20 @@ export function registerRoomRoutes(app: FastifyInstance, deps: AppDeps): void {
     }
 
     const game = getGame(live.gameId)!
-    if (store.participants(live).length < game.minPlayers) {
+    const participants = store.participants(live)
+    if (participants.length < game.minPlayers) {
       return reply.code(409).send({ code: 'NOT_ENOUGH_PLAYERS' })
+    }
+
+    // The lobby disables its start button on the same condition, but a button
+    // is not a rule. The roster freezes at createState, so a game begun with
+    // an empty team cannot be repaired: control alternates onto a side that
+    // can never pick, and the board plays itself out to a 0-0 tie.
+    if (game.teams?.length) {
+      const held = new Set(participants.map(p => p.team))
+      if (!game.teams.every(t => held.has(t.id))) {
+        return reply.code(409).send({ code: 'TEAMS_INCOMPLETE' })
+      }
     }
 
     // Reject before creating anything: a restored room (state present, runtime

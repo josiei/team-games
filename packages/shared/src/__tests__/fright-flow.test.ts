@@ -185,3 +185,57 @@ describe('tally', () => {
     expect(tally(state).winner).toBeNull()
   })
 })
+
+describe('a shot that is never taken is still spent', () => {
+  /** Buzz, enter `answer`, and say nothing: the phase clock runs out. */
+  function timedOut(): FrightState {
+    return setPhase(reduce(armed(), { type: 'BUZZ' }, BLUE), 'answer')
+  }
+
+  it('the buzzing team cannot buzz again in the steal they caused', () => {
+    const stolen = setPhase(timedOut(), 'steal')
+    expect(active(stolen).spentTeams).toContain('blue')
+    expect(reduce(stolen, { type: 'BUZZ' }, BLUE).clues[stolen.active!]!.buzzedBy)
+      .toBeNull()
+  })
+
+  it('the other team can still buzz in that steal', () => {
+    const stolen = setPhase(timedOut(), 'steal')
+    expect(reduce(stolen, { type: 'BUZZ' }, RED).clues[stolen.active!]!.buzzedBy)
+      .toBe(RED)
+  })
+
+  // Without this the clue loops answer -> steal -> answer forever on one
+  // player who buzzed and then walked away from their laptop.
+  it('both teams timing out reaches the reveal rather than looping', () => {
+    let s = timedOut()
+    expect(nextPhase(s, 'answer')).toBe('steal')
+    s = setPhase(s, 'steal')
+    s = setPhase(reduce(s, { type: 'BUZZ' }, RED), 'answer')
+    expect(nextPhase(s, 'answer')).toBe('reveal')
+  })
+
+  it('a timeout by the second team does not open a third shot', () => {
+    let s = timedOut()
+    s = setPhase(s, 'steal')
+    s = setPhase(reduce(s, { type: 'BUZZ' }, RED), 'answer')
+    s = setPhase(s, 'reveal')
+    expect(active(s).spentTeams.sort()).toEqual(['blue', 'red'])
+  })
+
+  it('a disconnect mid-answer forfeits that team shot too', () => {
+    // phaseComplete ends the phase early when the answerer has gone; the
+    // forfeit has to follow, or the room re-arms the absent team.
+    const s = timedOut()
+    expect(phaseComplete(s, 'answer', [player(RED, 'red', 2)])).toBe(true)
+    expect(active(setPhase(s, 'steal')).spentTeams).toContain('blue')
+  })
+})
+
+describe('the board ends promptly when there is nothing left', () => {
+  it('phaseComplete is true in board once every tile is spent', () => {
+    const s = { ...state, tiles: state.tiles.map(t => ({ ...t, spent: true })) }
+    // The host pressed End: the room must not sit out the rest of BOARD_MS.
+    expect(phaseComplete(s, 'board', PLAYERS)).toBe(true)
+  })
+})

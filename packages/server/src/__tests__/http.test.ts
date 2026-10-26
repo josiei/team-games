@@ -419,3 +419,56 @@ describe('a game that declares teams', () => {
     expect(res.json().code).toBe('BAD_TEAM')
   })
 })
+
+describe('starting a team game', () => {
+  const createFrightRoom = async () => {
+    const res = await app.inject({
+      method: 'POST', url: '/api/rooms', payload: { gameId: 'fright-night-dev' },
+    })
+    return res.json() as { code: string }
+  }
+  const setTeam = (code: string, playerToken: string, team: string | null) =>
+    app.inject({
+      method: 'POST', url: `/api/rooms/${code}/me`, payload: { playerToken, team },
+    })
+  const start = (code: string, playerToken: string) =>
+    app.inject({ method: 'POST', url: `/api/rooms/${code}/start`, payload: { playerToken } })
+
+  it('refuses to start while a declared team is empty', async () => {
+    // The lobby disables the button, but the button is not the rule.
+    const room = await createFrightRoom()
+    const host = (await join(room.code, 'Jocelyn')).json()
+    const guest = (await join(room.code, 'Sam')).json()
+    await setTeam(room.code, host.playerToken, 'blue')
+    await setTeam(room.code, guest.playerToken, 'blue')
+
+    const res = await start(room.code, host.playerToken)
+    expect(res.statusCode).toBe(409)
+    expect(res.json().code).toBe('TEAMS_INCOMPLETE')
+  })
+
+  it('refuses to start when nobody has picked a team at all', async () => {
+    const room = await createFrightRoom()
+    const host = (await join(room.code, 'Jocelyn')).json()
+    await join(room.code, 'Sam')
+    const res = await start(room.code, host.playerToken)
+    expect(res.statusCode).toBe(409)
+    expect(res.json().code).toBe('TEAMS_INCOMPLETE')
+  })
+
+  it('starts once every team has somebody', async () => {
+    const room = await createFrightRoom()
+    const host = (await join(room.code, 'Jocelyn')).json()
+    const guest = (await join(room.code, 'Sam')).json()
+    await setTeam(room.code, host.playerToken, 'blue')
+    await setTeam(room.code, guest.playerToken, 'red')
+    expect((await start(room.code, host.playerToken)).statusCode).toBe(200)
+  })
+
+  it('a game with no declared teams is unaffected', async () => {
+    const room = await createRoom()
+    const host = (await join(room.code, 'Jocelyn')).json()
+    await join(room.code, 'Sam')
+    expect((await start(room.code, host.playerToken)).statusCode).toBe(200)
+  })
+})

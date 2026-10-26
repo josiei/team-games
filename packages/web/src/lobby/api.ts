@@ -91,6 +91,7 @@ export function humanize(code: string): string {
     case 'NOT_A_PLAYER': return "You are not in this room any more. Rejoin with the code."
     case 'BAD_AVATAR': return 'Pick an avatar from the list.'
     case 'BAD_TEAM': return 'That team is not part of this game.'
+    case 'TEAMS_INCOMPLETE': return 'Every team needs at least one player.'
     case NETWORK_ERROR: return "Can't reach the server. Check your connection and try again."
     default: return 'Something went wrong. Try again.'
   }

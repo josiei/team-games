@@ -69,7 +69,7 @@ export function Results({ view, teams, labels, onLeave }: {
           <ul className="gallery">
             {view.gallery.map(item => (
               <li key={item.file} className="gallery-card">
-                <img src={item.file} alt={item.answer} />
+                <img src={item.file} alt={item.answer} loading="lazy" />
                 <span className="gallery-answer">{item.answer}</span>
                 <span className="gallery-meta">{item.categoryName} &middot; {item.value}</span>
               </li>
