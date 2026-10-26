@@ -248,6 +248,7 @@ export class RoomRuntime {
       // Branded PlayerId keys are not assignable to string keys; cast here only.
       labels: labelPlayers(players) as Record<string, string>,
       hostId: this.room.hostId,
+      ...(this.module.teams ? { teams: this.module.teams } : {}),
     }
   }
 

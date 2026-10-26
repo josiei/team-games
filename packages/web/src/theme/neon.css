@@ -1097,3 +1097,87 @@
   .picker-card { transition: none; }
   .picker-card:hover, .picker-card:focus-visible { transform: none; }
 }
+
+/* ---- Lobby teams ------------------------------------------------------- */
+
+.team-columns {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  margin-bottom: 18px;
+}
+
+.team-column {
+  display: grid;
+  gap: 10px;
+  align-content: start;
+  padding: 14px;
+  border: 2px solid var(--team, #666);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--team, #666) 12%, var(--shell-surface, #1a1826));
+}
+
+/* Your own team is outlined, never colour alone. */
+.team-column.is-mine {
+  box-shadow: 0 0 0 2px var(--shell-text, #f4f2f8) inset;
+}
+
+.team-name {
+  margin: 0;
+  font-family: Archivo, system-ui, sans-serif;
+  font-weight: 900;
+  font-size: 1rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  text-align: center;
+  color: var(--shell-text, #f4f2f8);
+}
+
+.team-roster { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; min-height: 60px; }
+
+.team-member {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-weight: 600;
+  color: var(--shell-text, #f4f2f8);
+}
+
+.team-member.is-quiet { color: var(--shell-muted, #9a95ad); font-style: italic; font-weight: 400; }
+
+.team-join { width: 100%; }
+
+.avatar-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+  margin-bottom: 18px;
+}
+
+.avatar-chip {
+  width: 44px;
+  height: 44px;
+  font-size: 1.25rem;
+  line-height: 1;
+  cursor: pointer;
+  border: 2px solid var(--shell-border, #2e2b3f);
+  border-radius: 50%;
+  background: var(--shell-surface, #1a1826);
+}
+
+.avatar-chip:hover, .avatar-chip:focus-visible { border-color: var(--shell-muted, #9a95ad); }
+
+/* Chosen: a ring plus a check, so it does not rely on colour. */
+.avatar-chip.is-mine {
+  border-color: #ffc24d;
+  box-shadow: 0 0 12px rgba(255, 194, 77, 0.7);
+}
+
+.avatar-chip.is-mine::after {
+  content: '\2713';
+  display: block;
+  font-size: 0.6rem;
+  margin-top: -4px;
+  color: #ffc24d;
+}

@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { ClientMessage, Player, PlayerId, ServerMessage } from '@tg/shared'
+import type { ClientMessage, Player, PlayerId, ServerMessage, Team } from '@tg/shared'
 
 export type Status = 'idle' | 'connecting' | 'open' | 'reconnecting' | 'closed' | 'taken-over'
 
@@ -10,6 +10,13 @@ type State = {
   players: Player[]
   labels: Record<string, string>
   hostId: PlayerId | null
+  /**
+   * Teams this room's game declares; undefined for a game without them.
+   * A required key holding `| undefined` rather than an optional one:
+   * exactOptionalPropertyTypes forbids assigning undefined to an optional
+   * key, and every snapshot sets this field one way or the other.
+   */
+  teams: readonly Team[] | undefined
   hostLine: string | null
   endsAt: number | null
   clockOffset: number
@@ -57,6 +64,7 @@ export const useConnection = create<State & Actions>((set, get) => ({
   players: [],
   labels: {},
   hostId: null,
+  teams: undefined,
   hostLine: null,
   endsAt: null,
   clockOffset: 0,
@@ -139,6 +147,7 @@ export const useConnection = create<State & Actions>((set, get) => ({
           players: message.players,
           labels: message.labels,
           hostId: message.hostId,
+          teams: message.teams,
           endsAt: message.endsAt,
           clockOffset: Date.now() - message.serverNow,
         }))

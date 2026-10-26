@@ -16,6 +16,8 @@ export type Player = {
   team: string | null
 }
 
+export type Team = { id: string; name: string; color: string }
+
 export type GameTheme = {
   accent: string
   accent2: string
@@ -95,7 +97,7 @@ export interface GameModule<State, Action, View> {
    * A game that declares none rejects every team id, rather than silently
    * accepting one it will never use.
    */
-  readonly teams?: readonly { id: string; name: string; color: string }[]
+  readonly teams?: readonly Team[]
 
   /**
    * Path to the card art the game picker shows, under the web client's static

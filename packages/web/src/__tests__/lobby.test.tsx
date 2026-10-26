@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { Lobby } from '../lobby/Lobby.js'
 import { JoinScreen } from '../lobby/JoinScreen.js'
 import { useConnection } from '../store/connection.js'
@@ -173,5 +173,117 @@ describe('Lobby roster', () => {
     const pips = container.querySelectorAll('svg.pip')
     expect(pips.length).toBe(2)
     for (const pip of pips) expect(pip.getAttribute('aria-hidden')).toBe('true')
+  })
+})
+
+describe('Lobby teams', () => {
+  const TEAMS = [
+    { id: 'blue', name: 'Blue', color: '#3B82F6' },
+    { id: 'red', name: 'Red', color: '#EF4444' },
+  ]
+
+  /** Resolves every request so setProfile's await settles. */
+  function okFetch() {
+    const mock = vi.fn(async () =>
+      ({ ok: true, json: async () => ({ ok: true }) }) as unknown as Response)
+    vi.stubGlobal('fetch', mock)
+    return mock
+  }
+
+  it('renders no team columns for a game that declares none', () => {
+    useConnection.setState({ teams: undefined })
+    render(<Lobby code={asRoomCode('AB2CD3')} playerToken="t" />)
+    expect(screen.queryByRole('button', { name: /join blue/i })).toBeNull()
+    expect(screen.getByText('Jocelyn')).toBeTruthy()      // the plain roster still renders
+  })
+
+  it('renders one column per declared team, each with a join button', () => {
+    useConnection.setState({ teams: TEAMS })
+    render(<Lobby code={asRoomCode('AB2CD3')} playerToken="t" />)
+    expect(screen.getByRole('button', { name: /join blue/i })).toBeTruthy()
+    expect(screen.getByRole('button', { name: /join red/i })).toBeTruthy()
+  })
+
+  it('joining a team posts the choice', async () => {
+    const mock = okFetch()
+    useConnection.setState({ teams: TEAMS })
+    render(<Lobby code={asRoomCode('AB2CD3')} playerToken="t" />)
+    fireEvent.click(screen.getByRole('button', { name: /join blue/i }))
+    await waitFor(() => expect(mock).toHaveBeenCalled())
+    const [url, init] = mock.mock.calls[0] as unknown as [string, RequestInit]
+    expect(url).toBe('/api/rooms/AB2CD3/me')
+    expect(JSON.parse(String(init.body))).toMatchObject({ playerToken: 't', team: 'blue' })
+  })
+
+  it('shows each player in their own team column', () => {
+    useConnection.setState({
+      teams: TEAMS,
+      players: [
+        { ...player(ME, 'Jocelyn', 1), team: 'blue' },
+        { ...player(OTHER, 'Sam', 2), team: 'red' },
+      ],
+    })
+    const { container } = render(<Lobby code={asRoomCode('AB2CD3')} playerToken="t" />)
+    const columns = [...container.querySelectorAll('.team-column')]
+    expect(columns).toHaveLength(2)
+    expect(columns[0]!.textContent).toContain('Jocelyn')
+    expect(columns[0]!.textContent).not.toContain('Sam')
+    expect(columns[1]!.textContent).toContain('Sam')
+  })
+
+  it('picking an avatar posts the choice', async () => {
+    const mock = okFetch()
+    useConnection.setState({ teams: TEAMS })
+    render(<Lobby code={asRoomCode('AB2CD3')} playerToken="t" />)
+    fireEvent.click(screen.getAllByRole('button', { name: /choose the .* avatar/i })[0]!)
+    await waitFor(() => expect(mock).toHaveBeenCalled())
+    const [url, init] = mock.mock.calls[0] as unknown as [string, RequestInit]
+    expect(url).toBe('/api/rooms/AB2CD3/me')
+    expect(JSON.parse(String(init.body)).avatar).toBeTruthy()
+  })
+
+  it('start is disabled while either team is empty', () => {
+    useConnection.setState({
+      teams: TEAMS,
+      players: [
+        { ...player(ME, 'Jocelyn', 1), team: 'blue' },
+        { ...player(OTHER, 'Sam', 2), team: 'blue' },
+      ],
+    })
+    render(<Lobby code={asRoomCode('AB2CD3')} playerToken="t" />)
+    expect((screen.getByRole('button', { name: /start/i }) as HTMLButtonElement).disabled)
+      .toBe(true)
+    expect(screen.getByText(/both teams need/i)).toBeTruthy()
+  })
+
+  it('start is enabled once both teams have someone', () => {
+    useConnection.setState({
+      teams: TEAMS,
+      players: [
+        { ...player(ME, 'Jocelyn', 1), team: 'blue' },
+        { ...player(OTHER, 'Sam', 2), team: 'red' },
+      ],
+    })
+    render(<Lobby code={asRoomCode('AB2CD3')} playerToken="t" />)
+    expect((screen.getByRole('button', { name: /start/i }) as HTMLButtonElement).disabled)
+      .toBe(false)
+  })
+
+  it('a lopsided split nudges but does not block start', () => {
+    const third = asPlayerId('third')
+    useConnection.setState({
+      teams: TEAMS,
+      players: [
+        { ...player(ME, 'Jocelyn', 1), team: 'blue' },
+        { ...player(OTHER, 'Sam', 2), team: 'blue' },
+        { ...player(third, 'Ash', 3), team: 'blue' },
+        { ...player(asPlayerId('fourth'), 'Kit', 4), team: 'red' },
+      ],
+      labels: { me: 'Jocelyn', other: 'Sam', third: 'Ash', fourth: 'Kit' },
+    })
+    render(<Lobby code={asRoomCode('AB2CD3')} playerToken="t" />)
+    expect(screen.getByText(/lopsided|uneven/i)).toBeTruthy()
+    expect((screen.getByRole('button', { name: /start/i }) as HTMLButtonElement).disabled)
+      .toBe(false)
   })
 })
