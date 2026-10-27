@@ -1,5 +1,6 @@
 import { useMemo } from 'react'
-import { useConnection, remainingMs } from '../../store/connection.js'
+import { useConnection } from '../../store/connection.js'
+import { useSecondsLeft } from '../../ui/useSecondsLeft.js'
 import { Set as GameSet } from './Set.js'
 import { Board, type BoardView } from './Board.js'
 import { Stage, type ClueView } from './Stage.js'
@@ -29,7 +30,9 @@ export function FrightGame({ onLeave }: { onLeave(): void }) {
   const hostId = useConnection(s => s.hostId)
   const isHost = me !== null && me === hostId
 
-  const secondsLeft = Math.ceil(remainingMs(endsAt, clockOffset) / 1000)
+  // Ticks on its own: between a buzz and an answer no snapshot arrives, so
+  // a value computed once per render would sit frozen for the whole window.
+  const secondsLeft = useSecondsLeft(endsAt, clockOffset)
 
   const controlName = useMemo(() => {
     if (view.kind !== 'fright-board') return ''

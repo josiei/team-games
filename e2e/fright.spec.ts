@@ -100,6 +100,16 @@ test('two teams play a full fright night board', async ({ browser, request }) =>
     { timeout: SLACK })
   expect((await choices(other)).every(c => c.disabled)).toBe(true)
 
+  // The clock counts down by itself. Nothing is broadcast between the buzz
+  // and the answer, so if this number only moved when a snapshot arrived it
+  // would sit frozen for the whole window and the room could not tell twelve
+  // seconds from one. Watched on `other`, which sends nothing at all here.
+  const clockOnOther = async () =>
+    Number(await other.locator('.answer-banner .buzzer-clock').innerText())
+  const startedAt = await clockOnOther()
+  expect(startedAt).toBeGreaterThan(0)
+  await expect.poll(clockOnOther, { timeout: 3_000 }).toBeLessThan(startedAt)
+
   // Spend a flashlight: two options dim HERE and nowhere else.
   await picker.getByRole('button', { name: /flashlight/i }).click()
   await expect.poll(async () => (await choices(picker)).filter(c => c.cut).length)
